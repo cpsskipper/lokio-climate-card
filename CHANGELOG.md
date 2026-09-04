@@ -1,5 +1,11 @@
 # Changelog
 
+
+## 0.3.14
+
+- Expanded the sensor touch target downward by 16 px without moving the visible icon or text.
+- Slightly widened the invisible touch target for more reliable mobile taps.
+
 All notable changes to Lokio Climate Card are documented here.
 
 

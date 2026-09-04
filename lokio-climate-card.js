@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.13
+ * v0.3.14
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.13";
+const VERSION = "0.3.14";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -899,7 +899,10 @@ class LokioClimateCard extends HTMLElement {
       .device ha-icon { width:21px; height:21px; display:block; margin:0; --mdc-icon-size:21px; }
       .device-separator { width:1px; height:18px; background:var(--lokio-climate-control-border, var(--divider-color)); opacity:.8; }
       .sensors { grid-area:sensors; transform:translateY(-5px); display:flex; align-items:center; gap:12px; min-width:0; overflow:visible; }
-      .sensor { min-height:39px; margin:-7px -5px; padding:7px 5px; border:0; border-radius:10px; background:transparent; display:grid; grid-template-columns:20px auto; column-gap:5px; align-items:center; cursor:pointer; white-space:nowrap; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+      .sensor { position:relative; z-index:5; min-height:39px; margin:-7px -5px; padding:7px 5px; border:0; border-radius:10px; background:transparent; display:grid; grid-template-columns:20px auto; column-gap:5px; align-items:center; cursor:pointer; white-space:nowrap; touch-action:manipulation; user-select:none; -webkit-user-select:none; overflow:visible; }
+      /* Invisible touch extension: keeps the icon/text exactly where they are,
+         but makes the whole sensor much easier to tap with a finger. */
+      .sensor::after { content:""; position:absolute; left:-6px; right:-6px; top:-3px; bottom:-16px; border-radius:12px; }
       .sensor ha-icon { width:18px; height:18px; color:var(--lokio-climate-icon-color, var(--secondary-text-color)); display:block; margin:0; --mdc-icon-size:18px; transform:translateY(-2px); pointer-events:none; }
       .sensor:active { background:color-mix(in srgb, var(--primary-text-color) 5%, transparent); }
       .sensor.active ha-icon { color:var(--sensor-color); }
