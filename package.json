@@ -1,0 +1,16 @@
+{
+  "name": "lokio-climate-card",
+  "version": "0.3.12",
+  "description": "Standalone multi-room climate card for Home Assistant dashboards",
+  "license": "MIT",
+  "private": false,
+  "files": [
+    "lokio-climate-card.js",
+    "dist/lokio-climate-card.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node --check lokio-climate-card.js && node --check dist/lokio-climate-card.js"
+  }
+}

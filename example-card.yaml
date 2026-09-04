@@ -1,0 +1,114 @@
+# Lokio Climate Card — full commented public example.
+# Replace every example entity ID with entities from your Home Assistant instance.
+
+type: custom:lokio-climate-card
+
+# Used only for browser-local UI state. Give different cards different keys.
+storage_key: main_climate
+
+# Reset the selected graph metric to temperature when changing rooms.
+reset_metric_on_room_change: true
+
+# Built-in Recorder graph.
+graph:
+  # History window in hours.
+  hours_to_show: 24
+
+  # null = keep all available Recorder state changes.
+  # Set a number only when you intentionally want to limit drawn points.
+  points: null
+
+  # 0 = no smoothing; 1 = strongest smoothing.
+  smoothing: 0
+
+  # Number of whole-hour time labels. 0 hides the time scale.
+  time_labels: 5
+
+  line_width: 2
+  show_extrema: true
+  refresh_seconds: 300
+
+rooms:
+  # ---------------------------------------------------------------------------
+  # Living room
+  # ---------------------------------------------------------------------------
+  - id: living_room
+    name: Living room
+    icon: mdi:sofa
+
+    # Main thermostat/climate entity. Header tap opens its more-info dialog.
+    climate: climate.living_room
+
+    # Extended sensor syntax allows per-sensor icon/color/precision overrides.
+    sensors:
+      temperature:
+        entity: sensor.living_room_temperature
+        icon: mdi:thermometer
+        color: "#ff9d45"
+        precision: 1
+      humidity:
+        entity: sensor.living_room_humidity
+        icon: mdi:water-percent
+        color: "#4fc3f7"
+        precision: 0
+      co2:
+        entity: sensor.living_room_co2
+        icon: mdi:molecule-co2
+        color: "#66bb6a"
+        precision: 0
+
+    # Optional device icons shown on the right side of the header.
+    ac: climate.living_room_ac
+    radiator: switch.living_room_radiator
+
+    # Optional entity opened by holding the card header.
+    reason: input_text.living_room_climate_reason
+
+    # Set false for rooms where target-temperature controls should be hidden.
+    target_temperature_visible: true
+
+  # ---------------------------------------------------------------------------
+  # Bedroom — short sensor syntax
+  # ---------------------------------------------------------------------------
+  - id: bedroom
+    name: Bedroom
+    icon: mdi:bed
+    climate: climate.bedroom
+    sensors:
+      temperature: sensor.bedroom_temperature
+      humidity: sensor.bedroom_humidity
+      co2: sensor.bedroom_co2
+    ac: climate.bedroom_ac
+    radiator: switch.bedroom_radiator
+    reason: input_text.bedroom_climate_reason
+    target_temperature_visible: true
+
+  # ---------------------------------------------------------------------------
+  # Ventilation / HRV — CO₂ omitted and target controls hidden
+  # ---------------------------------------------------------------------------
+  - id: ventilation
+    name: Ventilation
+    icon: mdi:air-filter
+    climate: climate.ventilation
+    sensors:
+      temperature: sensor.ventilation_temperature
+      humidity: sensor.ventilation_humidity
+
+    # The device entity may also be a switch if that matches your setup.
+    ac: switch.ventilation_power
+    target_temperature_visible: false
+    reason: input_text.ventilation_reason
+
+    # Optional state-dependent device styling.
+    ac_icons:
+      "on": mdi:fan
+      "off": mdi:fan-off
+      fan_only: mdi:fan
+      cool: mdi:snowflake
+      heat: mdi:radiator
+    ac_colors:
+      "on": "#4fc3f7"
+      "off": "#9aa0a6"
+      fan_only: "#4fc3f7"
+      cool: "#2196f3"
+      heat: "#ff9d45"
