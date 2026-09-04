@@ -1,6 +1,12 @@
 # Changelog
 
 
+## 0.3.15
+
+- Restored sensor buttons to their original 25 px touch height.
+- Moved the sensors layer above the graph so the graph can no longer intercept sensor taps.
+- Removed the enlarged invisible sensor touch extension introduced in 0.3.14.
+
 ## 0.3.14
 
 - Expanded the sensor touch target downward by 16 px without moving the visible icon or text.
