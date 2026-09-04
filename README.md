@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.12**
+**Current version: 0.3.13**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -43,6 +43,7 @@ See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for GitHub release and manual
 ```yaml
 type: custom:lokio-climate-card
 storage_key: living_room_climate
+room_columns: 4  # Number of room buttons per row (1–8)
 
 rooms:
   - id: living_room

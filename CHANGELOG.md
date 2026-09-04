@@ -2,6 +2,12 @@
 
 All notable changes to Lokio Climate Card are documented here.
 
+
+## 0.3.13
+
+- Added `room_columns` to configure the number of room selector buttons per row.
+- Default remains 4 columns. Values are clamped to 1–8.
+
 ## 0.3.12
 
 - Prepared the project for a public GitHub repository and HACS custom-repository installation.

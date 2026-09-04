@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.12
+ * v0.3.13
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.12";
+const VERSION = "0.3.13";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -90,6 +90,7 @@ class LokioClimateCard extends HTMLElement {
     const normalized = {
       storage_key: "default",
       reset_metric_on_room_change: true,
+      room_columns: 4,
       graph: {
         hours_to_show: 24,
         points: null,
@@ -778,7 +779,7 @@ class LokioClimateCard extends HTMLElement {
     ].join("");
 
     const roomButtons = this._config.rooms.length > 1 ? `
-      <div class="room-grid">
+      <div class="room-grid" style="--room-columns:${Math.max(1, Math.min(8, Math.round(Number(this._config.room_columns) || 4)))}">
         ${this._config.rooms.map((r) => {
           const st = this._entity(r.climate);
           const temp = Number(this._entity(r.sensors?.temperature?.entity)?.state);
@@ -922,7 +923,7 @@ class LokioClimateCard extends HTMLElement {
       .difference.negative { color:#4fc3f7; background:color-mix(in srgb, #4fc3f7 22%, transparent); }
       .difference.positive { color:#ff9d45; background:color-mix(in srgb, #ff9d45 25%, transparent); }
       .difference.neutral { color:var(--lokio-climate-difference-color, var(--secondary-text-color)); background:var(--lokio-climate-difference-background, color-mix(in srgb, var(--primary-text-color) 6%, transparent)); }
-      .room-grid { margin-top:8px; display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; }
+      .room-grid { margin-top:8px; display:grid; grid-template-columns:repeat(var(--room-columns, 4), minmax(0,1fr)); gap:8px; }
       .room-button { height:50px; padding:6px; border-radius:10px; background:var(--lokio-button-card-background-color, var(--ha-card-background, var(--card-background-color))); box-shadow:none; border:1px solid var(--lokio-climate-control-border, var(--divider-color)); display:grid; grid-template-areas:"name icon" "temp temp"; grid-template-columns:minmax(0,1fr) 26px; grid-template-rows:20px 1fr; row-gap:2px; cursor:pointer; text-align:left; }
       .room-button.selected { border:2px solid var(--primary-color); }
       .room-name { grid-area:name; align-self:start; font-size:10px; font-weight:600; line-height:14px; color:var(--lokio-climate-text-color, var(--primary-text-color)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
