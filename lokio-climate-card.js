@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.19
+ * v0.3.20
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.19";
+const VERSION = "0.3.20";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -971,13 +971,16 @@ class LokioClimateCard extends HTMLElement {
           <mask id="lokio-bottom-mask">
             <rect width="100%" height="100%" fill="url(#lokio-y-mask)" />
           </mask>
+          <clipPath id="lokio-graph-area-clip">
+            <path d="${area}" />
+          </clipPath>
         </defs>
         ${activityEnabled ? "" : `<g mask="url(#lokio-edge-mask)">
           <g mask="url(#lokio-bottom-mask)">
             <path d="${area}" fill="url(#lokio-fill)" />
           </g>
         </g>`}
-        ${activityRects}
+        ${activityRects ? `<g clip-path="url(#lokio-graph-area-clip)">${activityRects}</g>` : ""}
         <g mask="url(#lokio-edge-mask)">
           <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
         </g>

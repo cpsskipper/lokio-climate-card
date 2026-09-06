@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.3.19
+## 0.3.20
 
-- When `graph.activity.enabled: true`, the regular sensor area gradient is no longer drawn.
-- Activity bands remain visible beneath the graph line without competing with the normal graph fill.
-- When activity mode is disabled, the original graph gradient fill is unchanged.
+- Activity shading is now clipped to the sensor graph area instead of filling the full graph height.
+- Active-device colors fill only the area below the sensor line, matching the Home Assistant area-graph style more closely.
+- The regular sensor gradient remains disabled while `graph.activity.enabled: true`.
 
 ## 0.3.18
 
