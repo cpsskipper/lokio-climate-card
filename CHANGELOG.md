@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.19
+
+- When `graph.activity.enabled: true`, the regular sensor area gradient is no longer drawn.
+- Activity bands remain visible beneath the graph line without competing with the normal graph fill.
+- When activity mode is disabled, the original graph gradient fill is unchanged.
+
 ## 0.3.18
 
 - Fixed activity bands not appearing reliably after dashboard/card initialization.

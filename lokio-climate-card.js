@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.18
+ * v0.3.19
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.18";
+const VERSION = "0.3.19";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -923,6 +923,7 @@ class LokioClimateCard extends HTMLElement {
     const maxPoint = points.reduce((a, b) => b.v > a.v ? b : a, points[0]);
     const color = accent || "var(--climate-accent)";
     const showExtrema = this._config.graph.show_extrema !== false;
+    const activityEnabled = this._activityEnabled();
     const activityRects = this._activityRects(minT, maxT, w, h);
 
     const timeLabelCountRaw = Number(this._config.graph.time_labels);
@@ -971,11 +972,11 @@ class LokioClimateCard extends HTMLElement {
             <rect width="100%" height="100%" fill="url(#lokio-y-mask)" />
           </mask>
         </defs>
-        <g mask="url(#lokio-edge-mask)">
+        ${activityEnabled ? "" : `<g mask="url(#lokio-edge-mask)">
           <g mask="url(#lokio-bottom-mask)">
             <path d="${area}" fill="url(#lokio-fill)" />
           </g>
-        </g>
+        </g>`}
         ${activityRects}
         <g mask="url(#lokio-edge-mask)">
           <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
