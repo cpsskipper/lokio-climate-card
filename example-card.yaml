@@ -27,6 +27,8 @@ graph:
   line_width: 2
   show_extrema: true
   refresh_seconds: 300
+  activity:
+    enabled: false
 
 rooms:
   # ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ rooms:
     # Optional device icons shown on the right side of the header.
     ac: climate.living_room_ac
     radiator: switch.living_room_radiator
+    hrv: switch.living_room_hrv
 
     # Optional entity opened by holding the card header.
     reason: input_text.living_room_climate_reason

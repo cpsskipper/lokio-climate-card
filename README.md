@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.13**
+**Current version: 0.3.17**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -14,8 +14,9 @@ Lokio Climate Card combines room selection, climate state, temperature/humidity/
 - temperature, humidity and CO₂ sensors, plus custom sensor definitions;
 - tap a sensor to switch the graph, hold for Home Assistant `more-info`;
 - built-in Recorder history graph with Min/Max, smoothing and time labels;
+- optional Home Assistant-style graph activity shading for AC and radiator operation (`switch` or `climate`);
 - target-temperature controls, optionally hidden per room;
-- AC/ventilation and radiator device indicators;
+- separate AC, radiator and HRV/ventilation device indicators;
 - fixed or state-dependent MDI icons and colors;
 - no `input_select` helpers required;
 - no `button-card`, `mini-graph-card`, `config-template-card` or `card-mod` dependency.
@@ -54,6 +55,7 @@ rooms:
       humidity: sensor.living_room_humidity
     ac: climate.living_room_ac
     radiator: switch.living_room_radiator
+    hrv: switch.living_room_hrv
     target_temperature_visible: true
 ```
 
@@ -70,11 +72,35 @@ graph:
   line_width: 2
   show_extrema: true
   refresh_seconds: 300
+
+  # Optional. Disabled by default, so it adds no extra history requests unless enabled.
+  activity:
+    enabled: false
 ```
 
 `points: null` uses all available Recorder state changes after the card's built-in cleanup. Increasing `points` cannot create measurements that are not present in Recorder.
 
 `smoothing: 0` draws the unsmoothed line. Values from `0.1` to `0.25` provide light smoothing; `1` is the strongest smoothing. `time_labels: 0` hides the time scale.
+
+### Device activity shading
+
+Activity shading is disabled by default. When enabled, the card requests additional Recorder history only for the configured AC and/or radiator and paints their active intervals behind the sensor graph.
+
+```yaml
+graph:
+  activity:
+    enabled: true
+    ac:
+      enabled: true
+      opacity: 0.12
+    radiator:
+      enabled: true
+      opacity: 0.12
+```
+
+Both `ac` and `radiator` may point to either a `switch` or a `climate` entity. For a `climate` entity the card reads historical `hvac_action`; AC supports `cooling`, `heating`, `drying` and `fan`, while radiator shading is drawn only for `hvac_action: heating`. For a `switch`, the `on` intervals are shaded. If `activity.enabled` is `false`, these extra history requests and activity layers are not used.
+
+Optional AC colors are `on_color`, `cooling_color`, `heating_color`, `drying_color` and `fan_color`. `on_color` is used when `ac` is a switch. `activity.radiator.color` is used for both switch `on` intervals and climate `heating` intervals.
 
 ## Full room example
 
@@ -102,6 +128,7 @@ graph:
 
   ac: climate.living_room_ac
   radiator: switch.living_room_radiator
+  hrv: switch.living_room_hrv
   reason: input_text.living_room_climate_reason
   target_temperature_visible: true
 ```
@@ -124,6 +151,8 @@ ac_icon: mdi:air-conditioner
 ac_color: "#4fc3f7"
 radiator_icon: mdi:radiator
 radiator_color: "#ff9d45"
+hrv_icon: mdi:air-filter
+hrv_color: "#4fc3f7"
 ```
 
 State-dependent values:
@@ -148,9 +177,16 @@ radiator_icons:
 radiator_colors:
   "on": "#ff9d45"
   "off": "#9aa0a6"
+
+hrv_icons:
+  "on": mdi:air-filter
+  "off": mdi:air-filter
+hrv_colors:
+  "on": "#4fc3f7"
+  "off": "#9aa0a6"
 ```
 
-Fixed `ac_icon`/`ac_color` values take priority over the state maps. The radiator options behave the same way.
+Fixed `ac_icon`/`ac_color` values take priority over the state maps. Radiator and HRV options behave the same way.
 
 ## Local UI state
 
@@ -168,10 +204,10 @@ storage_key: first_floor
 - header hold → `more-info` for `reason`, when configured;
 - sensor tap → select that metric for the graph;
 - sensor hold → sensor `more-info`;
-- AC/radiator tap → device `more-info`;
+- AC/radiator/HRV tap → device `more-info`;
 - target arrows → change the target temperature by 0.5 °C.
 
-Sensor touch targets are intentionally larger than the visible icon/text to improve phone usability.
+Sensor controls use their normal visual touch area and are kept above the graph layer so the graph cannot intercept sensor taps.
 
 ## Documentation
 

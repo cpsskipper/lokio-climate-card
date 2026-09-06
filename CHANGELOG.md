@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.17
+
+- AC activity shading now supports both `switch` and `climate` entities. Switch activity uses `on` intervals; climate activity uses historical `hvac_action`.
+- Radiator activity shading now supports both `switch` and `climate` entities. Climate radiators are shaded only while `hvac_action` is `heating`.
+- Added a dedicated optional `hrv` room entity with its own device icon, color overrides and state maps.
+- Added `hrv_icon`, `hrv_color`, `hrv_icons` and `hrv_colors`.
+- Updated public examples and documentation.
+
+## 0.3.16
+
+- Added optional Home Assistant-style graph background shading for AC and radiator operation.
+- Added `graph.activity.enabled` master switch; default is `false`, so no extra activity history requests are made unless explicitly enabled.
+- AC shading uses historical `hvac_action` (`cooling`, `heating`, `drying`, `fan`) and radiator shading uses `on` intervals.
+- Added per-device enable switches, opacity settings and optional activity colors.
+- Activity history is refreshed using the existing `graph.refresh_seconds` interval and cached separately from the selected sensor history.
 
 ## 0.3.15
 
