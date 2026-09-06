@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.21**
+**Current version: 0.3.22**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -71,6 +71,13 @@ graph:
   time_labels: 5
   line_width: 2
   show_extrema: true
+
+  # Optional fixed vertical scale. `show` controls only the labels.
+  vertical_axis:
+    show: false
+    min: 18
+    max: 28
+
   refresh_seconds: 300
 
   # Optional. Disabled by default, so it adds no extra history requests unless enabled.
@@ -80,7 +87,7 @@ graph:
 
 `points: null` uses all available Recorder state changes after the card's built-in cleanup. Increasing `points` cannot create measurements that are not present in Recorder.
 
-`smoothing: 0` draws the unsmoothed line. Values from `0.1` to `0.25` provide light smoothing; `1` is the strongest smoothing. `time_labels: 0` hides the time scale.
+`smoothing: 0` draws the unsmoothed line. Values from `0.1` to `0.25` provide light smoothing; `1` is the strongest smoothing. `time_labels: 0` hides the time scale. `vertical_axis.min` and `vertical_axis.max` set a fixed Y range; `vertical_axis.show` shows or hides the two Y-axis labels.
 
 ### Device activity shading
 

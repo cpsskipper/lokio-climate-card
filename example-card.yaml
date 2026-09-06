@@ -26,6 +26,10 @@ graph:
 
   line_width: 2
   show_extrema: true
+  vertical_axis:
+    show: false
+    min: 18
+    max: 28
   refresh_seconds: 300
   activity:
     enabled: false

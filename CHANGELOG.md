@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.22
+
+- Added optional fixed vertical graph scale via `graph.vertical_axis.min` and `max`.
+- Added `graph.vertical_axis.show` to show/hide the two Y-axis labels.
+- Vertical-axis labels use the same typography as the horizontal time scale.
+
 ## 0.3.21
 
 - Added a historical target-temperature setpoint line to activity mode.

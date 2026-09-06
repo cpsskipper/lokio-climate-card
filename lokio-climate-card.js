@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.21
+ * v0.3.22
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.21";
+const VERSION = "0.3.22";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -106,6 +106,12 @@ class LokioClimateCard extends HTMLElement {
         show_extrema: true,
         refresh_seconds: 300,
         ...(config.graph || {}),
+        vertical_axis: {
+          show: false,
+          min: null,
+          max: null,
+          ...(config.graph?.vertical_axis || {}),
+        },
         activity: {
           enabled: false,
           ...activityConfig,
@@ -961,10 +967,23 @@ class LokioClimateCard extends HTMLElement {
       minV = Math.min(minV, ...targetValues);
       maxV = Math.max(maxV, ...targetValues);
     }
-    const valueRange = maxV - minV;
-    const visualPad = valueRange > 0 ? valueRange * 0.10 : 0.5;
-    minV -= visualPad;
-    maxV += visualPad;
+
+    const verticalAxis = this._config.graph.vertical_axis || {};
+    const configuredMinV = Number(verticalAxis.min);
+    const configuredMaxV = Number(verticalAxis.max);
+    const hasConfiguredMin = verticalAxis.min !== null && verticalAxis.min !== "" && Number.isFinite(configuredMinV);
+    const hasConfiguredMax = verticalAxis.max !== null && verticalAxis.max !== "" && Number.isFinite(configuredMaxV);
+    const validConfiguredRange = hasConfiguredMin && hasConfiguredMax && configuredMinV < configuredMaxV;
+
+    if (validConfiguredRange) {
+      minV = configuredMinV;
+      maxV = configuredMaxV;
+    } else {
+      const valueRange = maxV - minV;
+      const visualPad = valueRange > 0 ? valueRange * 0.10 : 0.5;
+      minV -= visualPad;
+      maxV += visualPad;
+    }
 
     const x = (t) => padX + ((t - minT) / Math.max(1, maxT - minT)) * (w - padX * 2);
     const y = (v) => h - padY - ((v - minV) / Math.max(0.0001, maxV - minV)) * (h - padY * 2);
@@ -1016,6 +1035,11 @@ class LokioClimateCard extends HTMLElement {
         }).join("")
       : "";
 
+    const showVerticalAxis = verticalAxis.show === true;
+    const verticalAxisLabels = showVerticalAxis
+      ? `<div class="graph-y-axis"><span class="y-max">${this._escape(formatValue(maxV))}</span><span class="y-min">${this._escape(formatValue(minV))}</span></div>`
+      : "";
+
     return `
       ${showExtrema ? `<div class="graph-extrema">
         <div class="extrema-block min-block"><span class="extrema-label">Min</span><span class="extrema-value">${this._escape(formatValue(rawMinV))}</span><span class="extrema-time">${this._escape(formatTime(minPoint.t))}</span></div>
@@ -1059,6 +1083,7 @@ class LokioClimateCard extends HTMLElement {
           <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
         </g>
       </svg>
+      ${verticalAxisLabels}
       ${timeLabels ? `<div class="graph-time-axis" style="--time-label-count:${timeLabelCount}">${timeLabels}</div>` : ""}`;
   }
 
@@ -1239,6 +1264,8 @@ class LokioClimateCard extends HTMLElement {
       .max-block { align-items:flex-end; text-align:right; }
       .extrema-label, .extrema-value, .extrema-time { display:block; }
       .graph-svg { position:absolute; left:-14px; right:-18px; bottom:12px; width:calc(100% + 32px); height:108px; display:block; overflow:visible; }
+      .graph-y-axis { position:absolute; left:-8px; top:35px; bottom:17px; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-start; pointer-events:none; color:var(--lokio-button-card-state-color, var(--secondary-text-color)); font-size:9px; font-weight:400; line-height:10px; opacity:.82; z-index:3; }
+      .graph-y-axis span { white-space:nowrap; }
       .graph-time-axis { position:absolute; left:-8px; right:-12px; bottom:4px; display:grid; grid-template-columns:repeat(var(--time-label-count), minmax(0,1fr)); align-items:end; pointer-events:none; color:var(--lokio-button-card-state-color, var(--secondary-text-color)); font-size:9px; font-weight:400; line-height:10px; opacity:.82; z-index:3; }
       .graph-time-axis span { min-width:0; text-align:center; white-space:nowrap; }
       .graph-time-axis span:first-child { text-align:left; padding-left:6px; }
