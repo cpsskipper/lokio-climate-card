@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.18
+
+- Fixed activity bands not appearing reliably after dashboard/card initialization.
+- Activity bands are now rendered above the sensor area fill and below the graph line for better visibility.
+- Added HRV activity history and shading via `graph.activity.hrv`.
+- `ac`, `radiator`, and `hrv` activity sources support both `switch` and `climate`.
+- Added climate-state fallback when historical `hvac_action` is missing.
+
 ## 0.3.17
 
 - AC activity shading now supports both `switch` and `climate` entities. Switch activity uses `on` intervals; climate activity uses historical `hvac_action`.

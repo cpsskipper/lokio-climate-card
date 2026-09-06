@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.17
+ * v0.3.18
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.17";
+const VERSION = "0.3.18";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -76,7 +76,7 @@ class LokioClimateCard extends HTMLElement {
     this._historyEntity = null;
     this._historyFetchedAt = 0;
     this._historyLoading = false;
-    this._activityHistory = { ac: [], radiator: [] };
+    this._activityHistory = { ac: [], radiator: [], hrv: [] };
     this._activityHistoryRoomId = null;
     this._activityFetchedAt = 0;
     this._activityLoading = false;
@@ -125,6 +125,15 @@ class LokioClimateCard extends HTMLElement {
             color: "#ff9d45",
             ...(activityConfig.radiator || {}),
           },
+          hrv: {
+            enabled: true,
+            opacity: 0.10,
+            on_color: "#66bb6a",
+            fan_color: "#4dd0e1",
+            cooling_color: "#4fc3f7",
+            heating_color: "#ffb74d",
+            ...(activityConfig.hrv || {}),
+          },
         },
       },
       rooms: config.rooms.map((room, index) => this._normalizeRoom(room, index)),
@@ -134,6 +143,12 @@ class LokioClimateCard extends HTMLElement {
     this._restoreUiState();
     this._ensureValidSelection();
     this._queueRender();
+    // Home Assistant can assign hass before setConfig on some dashboard updates.
+    // Start history requests here as well so activity bands are not missed.
+    if (this._hass) {
+      this._maybeLoadHistory(true);
+      this._maybeLoadActivityHistory(true);
+    }
   }
 
   set hass(hass) {
@@ -157,11 +172,15 @@ class LokioClimateCard extends HTMLElement {
       const acPrev = room?.ac ? previous?.states?.[room.ac] : null;
       const radiatorNow = room?.radiator ? hass?.states?.[room.radiator] : null;
       const radiatorPrev = room?.radiator ? previous?.states?.[room.radiator] : null;
+      const hrvNow = room?.hrv ? hass?.states?.[room.hrv] : null;
+      const hrvPrev = room?.hrv ? previous?.states?.[room.hrv] : null;
       const activityChanged =
         acNow?.state !== acPrev?.state ||
         acNow?.attributes?.hvac_action !== acPrev?.attributes?.hvac_action ||
         radiatorNow?.state !== radiatorPrev?.state ||
-        radiatorNow?.attributes?.hvac_action !== radiatorPrev?.attributes?.hvac_action;
+        radiatorNow?.attributes?.hvac_action !== radiatorPrev?.attributes?.hvac_action ||
+        hrvNow?.state !== hrvPrev?.state ||
+        hrvNow?.attributes?.hvac_action !== hrvPrev?.attributes?.hvac_action;
       this._maybeLoadActivityHistory(activityChanged);
     }
   }
@@ -274,7 +293,7 @@ class LokioClimateCard extends HTMLElement {
 
     this._history = [];
     this._historyEntity = null;
-    this._activityHistory = { ac: [], radiator: [] };
+    this._activityHistory = { ac: [], radiator: [], hrv: [] };
     this._activityHistoryRoomId = null;
     this._saveUiState();
     this._queueRender();
@@ -359,8 +378,9 @@ class LokioClimateCard extends HTMLElement {
     const activity = this._config.graph.activity || {};
     const wantAc = activity.ac?.enabled !== false && Boolean(room.ac);
     const wantRadiator = activity.radiator?.enabled !== false && Boolean(room.radiator);
-    if (!wantAc && !wantRadiator) {
-      this._activityHistory = { ac: [], radiator: [] };
+    const wantHrv = activity.hrv?.enabled !== false && Boolean(room.hrv);
+    if (!wantAc && !wantRadiator && !wantHrv) {
+      this._activityHistory = { ac: [], radiator: [], hrv: [] };
       this._activityHistoryRoomId = room.id;
       return;
     }
@@ -378,13 +398,16 @@ class LokioClimateCard extends HTMLElement {
 
       const acDomain = this._entityDomain(room.ac);
       const radiatorDomain = this._entityDomain(room.radiator);
-      const [acResult, radiatorResult] = await Promise.allSettled([
+      const hrvDomain = this._entityDomain(room.hrv);
+      const [acResult, radiatorResult, hrvResult] = await Promise.allSettled([
         wantAc ? this._fetchHistoryRows(room.ac, start, end, acDomain === "climate") : Promise.resolve([]),
         wantRadiator ? this._fetchHistoryRows(room.radiator, start, end, radiatorDomain === "climate") : Promise.resolve([]),
+        wantHrv ? this._fetchHistoryRows(room.hrv, start, end, hrvDomain === "climate") : Promise.resolve([]),
       ]);
 
       const acRows = acResult.status === "fulfilled" ? acResult.value : [];
       const radiatorRows = radiatorResult.status === "fulfilled" ? radiatorResult.value : [];
+      const hrvRows = hrvResult.status === "fulfilled" ? hrvResult.value : [];
 
       const mapRows = (rows, domain) => rows.map((row) => ({
         t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
@@ -395,16 +418,17 @@ class LokioClimateCard extends HTMLElement {
 
       const ac = mapRows(acRows, acDomain);
       const radiator = mapRows(radiatorRows, radiatorDomain);
+      const hrv = mapRows(hrvRows, hrvDomain);
 
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac, radiator };
+        this._activityHistory = { ac, radiator, hrv };
         this._activityHistoryRoomId = requestedRoomId;
         this._activityFetchedAt = Date.now();
       }
     } catch (err) {
       console.warn("Lokio Climate Card: activity history request failed", err);
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac: [], radiator: [] };
+        this._activityHistory = { ac: [], radiator: [], hrv: [] };
         this._activityHistoryRoomId = requestedRoomId;
       }
     } finally {
@@ -453,6 +477,11 @@ class LokioClimateCard extends HTMLElement {
         if (action === "heating") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
         if (action === "drying") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
         if (action === "fan") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
+        // Fallback for climate history where hvac_action is unavailable.
+        if (!action && row.state === "cool") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
+        if (!action && row.state === "heat") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
+        if (!action && row.state === "dry") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
+        if (!action && row.state === "fan_only") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
         return null;
       });
     }
@@ -463,11 +492,32 @@ class LokioClimateCard extends HTMLElement {
         if (row.domain === "switch") {
           return row.state === "on" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
         }
-        return row.action === "heating" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
+        const action = row.action || "";
+        if (action === "heating") return { color: cfg.radiator.color || "#ff9d45", opacity };
+        // Fallback for climate history that does not contain hvac_action.
+        return !action && row.state === "heat" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
       });
     }
 
-    return rects.length ? `<g class="activity-layer">${rects.join("")}</g>` : "";
+    if (cfg.hrv?.enabled !== false && room.hrv) {
+      const opacity = Math.max(0, Math.min(1, Number(cfg.hrv?.opacity) || 0));
+      addIntervals(this._activityHistory.hrv, (row) => {
+        if (row.domain === "switch") {
+          return row.state === "on" ? { color: cfg.hrv.on_color || cfg.hrv.fan_color || "#66bb6a", opacity } : null;
+        }
+        const action = row.action || "";
+        if (action === "cooling") return { color: cfg.hrv.cooling_color || "#4fc3f7", opacity };
+        if (action === "heating") return { color: cfg.hrv.heating_color || "#ffb74d", opacity };
+        if (action === "fan") return { color: cfg.hrv.fan_color || "#4dd0e1", opacity };
+        // Fallback for climate HRV entities without historical hvac_action.
+        if (!action && ["fan_only", "auto", "heat_cool"].includes(row.state)) {
+          return { color: cfg.hrv.fan_color || cfg.hrv.on_color || "#66bb6a", opacity };
+        }
+        return null;
+      });
+    }
+
+    return rects.length ? `<g class="activity-layer" pointer-events="none">${rects.join("")}</g>` : "";
   }
 
   _queueRender() {
@@ -921,12 +971,14 @@ class LokioClimateCard extends HTMLElement {
             <rect width="100%" height="100%" fill="url(#lokio-y-mask)" />
           </mask>
         </defs>
-        ${activityRects}
         <g mask="url(#lokio-edge-mask)">
           <g mask="url(#lokio-bottom-mask)">
             <path d="${area}" fill="url(#lokio-fill)" />
-            <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
           </g>
+        </g>
+        ${activityRects}
+        <g mask="url(#lokio-edge-mask)">
+          <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
         </g>
       </svg>
       ${timeLabels ? `<div class="graph-time-axis" style="--time-label-count:${timeLabelCount}">${timeLabels}</div>` : ""}`;
