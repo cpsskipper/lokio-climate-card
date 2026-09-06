@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.21
+
+- Added a historical target-temperature setpoint line to activity mode.
+- The setpoint line is shown only while `graph.activity.enabled: true`, so disabling activity mode also disables its history request and rendering.
+- Target history is read from the room's main `climate` entity `temperature` attribute and drawn as a step line.
+- Added `graph.activity.target_temperature.enabled`, `color`, `line_width`, and `opacity`.
+- Default target-temperature color is green (`#66bb6a`) to remain distinct from cooling blue and heating orange.
+- Target values participate in the graph Y range when the line is enabled, preventing the setpoint from being clipped outside the visible chart.
+
 ## 0.3.20
 
 - Activity shading is now clipped to the sensor graph area instead of filling the full graph height.

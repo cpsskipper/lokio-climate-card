@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.20**
+**Current version: 0.3.21**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -84,7 +84,7 @@ graph:
 
 ### Device activity shading
 
-Activity shading is disabled by default. When enabled, the card requests additional Recorder history only for the configured AC, radiator and/or HRV and paints their active intervals behind the sensor graph.
+Activity mode is disabled by default. When enabled, the card requests additional Recorder history for configured AC/radiator/HRV activity and for the main climate target-temperature setpoint, then paints active intervals behind the sensor graph and draws the target setpoint as a step line.
 
 ```yaml
 graph:
@@ -99,9 +99,16 @@ graph:
     hrv:
       enabled: true
       opacity: 0.10
+    target_temperature:
+      enabled: true
+      color: "#66bb6a"
+      line_width: 1.2
+      opacity: 0.95
 ```
 
 `ac`, `radiator` and `hrv` may each point to either a `switch` or a `climate` entity. For a `climate` entity the card prefers historical `hvac_action`; AC supports `cooling`, `heating`, `drying` and `fan`, radiator uses `heating`, and HRV supports `cooling`, `heating` and `fan`. For a `switch`, `on` intervals are shaded. When historical `hvac_action` is unavailable, the card has a conservative fallback to the climate mode state. If `activity.enabled` is `false`, these extra history requests and activity layers are not used.
+
+While activity mode is enabled, the card also draws the historical target-temperature setpoint of the room's main `climate` entity as a step line. It is enabled by default inside activity mode and uses green (`#66bb6a`) by default. Configure it with `activity.target_temperature.enabled`, `color`, `line_width`, and `opacity`.
 
 Optional AC colors are `on_color`, `cooling_color`, `heating_color`, `drying_color` and `fan_color`. `on_color` is used when `ac` is a switch. `activity.radiator.color` is used for both switch `on` intervals and climate `heating` intervals. HRV colors can be customized with `on_color`, `fan_color`, `cooling_color` and `heating_color`.
 

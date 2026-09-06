@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.20
+ * v0.3.21
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.20";
+const VERSION = "0.3.21";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -76,7 +76,7 @@ class LokioClimateCard extends HTMLElement {
     this._historyEntity = null;
     this._historyFetchedAt = 0;
     this._historyLoading = false;
-    this._activityHistory = { ac: [], radiator: [], hrv: [] };
+    this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
     this._activityHistoryRoomId = null;
     this._activityFetchedAt = 0;
     this._activityLoading = false;
@@ -134,6 +134,13 @@ class LokioClimateCard extends HTMLElement {
             heating_color: "#ffb74d",
             ...(activityConfig.hrv || {}),
           },
+          target_temperature: {
+            enabled: true,
+            color: "#66bb6a",
+            line_width: 1.2,
+            opacity: 0.95,
+            ...(activityConfig.target_temperature || {}),
+          },
         },
       },
       rooms: config.rooms.map((room, index) => this._normalizeRoom(room, index)),
@@ -174,13 +181,16 @@ class LokioClimateCard extends HTMLElement {
       const radiatorPrev = room?.radiator ? previous?.states?.[room.radiator] : null;
       const hrvNow = room?.hrv ? hass?.states?.[room.hrv] : null;
       const hrvPrev = room?.hrv ? previous?.states?.[room.hrv] : null;
+      const climateNow = room?.climate ? hass?.states?.[room.climate] : null;
+      const climatePrev = room?.climate ? previous?.states?.[room.climate] : null;
       const activityChanged =
         acNow?.state !== acPrev?.state ||
         acNow?.attributes?.hvac_action !== acPrev?.attributes?.hvac_action ||
         radiatorNow?.state !== radiatorPrev?.state ||
         radiatorNow?.attributes?.hvac_action !== radiatorPrev?.attributes?.hvac_action ||
         hrvNow?.state !== hrvPrev?.state ||
-        hrvNow?.attributes?.hvac_action !== hrvPrev?.attributes?.hvac_action;
+        hrvNow?.attributes?.hvac_action !== hrvPrev?.attributes?.hvac_action ||
+        climateNow?.attributes?.temperature !== climatePrev?.attributes?.temperature;
       this._maybeLoadActivityHistory(activityChanged);
     }
   }
@@ -293,7 +303,7 @@ class LokioClimateCard extends HTMLElement {
 
     this._history = [];
     this._historyEntity = null;
-    this._activityHistory = { ac: [], radiator: [], hrv: [] };
+    this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
     this._activityHistoryRoomId = null;
     this._saveUiState();
     this._queueRender();
@@ -379,8 +389,9 @@ class LokioClimateCard extends HTMLElement {
     const wantAc = activity.ac?.enabled !== false && Boolean(room.ac);
     const wantRadiator = activity.radiator?.enabled !== false && Boolean(room.radiator);
     const wantHrv = activity.hrv?.enabled !== false && Boolean(room.hrv);
-    if (!wantAc && !wantRadiator && !wantHrv) {
-      this._activityHistory = { ac: [], radiator: [], hrv: [] };
+    const wantTarget = activity.target_temperature?.enabled !== false && Boolean(room.climate);
+    if (!wantAc && !wantRadiator && !wantHrv && !wantTarget) {
+      this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
       this._activityHistoryRoomId = room.id;
       return;
     }
@@ -399,15 +410,17 @@ class LokioClimateCard extends HTMLElement {
       const acDomain = this._entityDomain(room.ac);
       const radiatorDomain = this._entityDomain(room.radiator);
       const hrvDomain = this._entityDomain(room.hrv);
-      const [acResult, radiatorResult, hrvResult] = await Promise.allSettled([
+      const [acResult, radiatorResult, hrvResult, targetResult] = await Promise.allSettled([
         wantAc ? this._fetchHistoryRows(room.ac, start, end, acDomain === "climate") : Promise.resolve([]),
         wantRadiator ? this._fetchHistoryRows(room.radiator, start, end, radiatorDomain === "climate") : Promise.resolve([]),
         wantHrv ? this._fetchHistoryRows(room.hrv, start, end, hrvDomain === "climate") : Promise.resolve([]),
+        wantTarget ? this._fetchHistoryRows(room.climate, start, end, true) : Promise.resolve([]),
       ]);
 
       const acRows = acResult.status === "fulfilled" ? acResult.value : [];
       const radiatorRows = radiatorResult.status === "fulfilled" ? radiatorResult.value : [];
       const hrvRows = hrvResult.status === "fulfilled" ? hrvResult.value : [];
+      const targetRows = targetResult.status === "fulfilled" ? targetResult.value : [];
 
       const mapRows = (rows, domain) => rows.map((row) => ({
         t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
@@ -419,16 +432,27 @@ class LokioClimateCard extends HTMLElement {
       const ac = mapRows(acRows, acDomain);
       const radiator = mapRows(radiatorRows, radiatorDomain);
       const hrv = mapRows(hrvRows, hrvDomain);
+      const target = targetRows.map((row) => ({
+        t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
+        v: Number(row.attributes?.temperature),
+      })).filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v));
+      const currentTarget = Number(this._hass?.states?.[room.climate]?.attributes?.temperature);
+      if (wantTarget && Number.isFinite(currentTarget)) {
+        const last = target[target.length - 1];
+        if (!last || last.v !== currentTarget || last.t < end.getTime() - 1000) {
+          target.push({ t: end.getTime(), v: currentTarget });
+        }
+      }
 
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac, radiator, hrv };
+        this._activityHistory = { ac, radiator, hrv, target };
         this._activityHistoryRoomId = requestedRoomId;
         this._activityFetchedAt = Date.now();
       }
     } catch (err) {
       console.warn("Lokio Climate Card: activity history request failed", err);
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac: [], radiator: [], hrv: [] };
+        this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
         this._activityHistoryRoomId = requestedRoomId;
       }
     } finally {
@@ -518,6 +542,46 @@ class LokioClimateCard extends HTMLElement {
     }
 
     return rects.length ? `<g class="activity-layer" pointer-events="none">${rects.join("")}</g>` : "";
+  }
+
+  _targetTemperaturePath(minT, maxT, x, y) {
+    if (!this._activityEnabled()) return "";
+    const room = this._currentRoom();
+    if (!room || this._activityHistoryRoomId !== room.id) return "";
+    const cfg = this._config.graph.activity?.target_temperature || {};
+    if (cfg.enabled === false) return "";
+
+    const rows = Array.isArray(this._activityHistory.target)
+      ? this._activityHistory.target.filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v)).sort((a, b) => a.t - b.t)
+      : [];
+    if (!rows.length) return "";
+
+    // Target temperature is a setpoint, so draw it as a step line: each value
+    // remains active until Home Assistant records the next target change.
+    const visible = rows.filter((row) => row.t <= maxT);
+    if (!visible.length) return "";
+    let current = visible[0];
+    for (const row of visible) {
+      if (row.t <= minT) current = row;
+      else break;
+    }
+
+    const segments = [{ t: minT, v: current.v }];
+    for (const row of visible) {
+      if (row.t <= minT || row.t > maxT) continue;
+      const prev = segments[segments.length - 1];
+      segments.push({ t: row.t, v: prev.v });
+      segments.push({ t: row.t, v: row.v });
+    }
+    const lastValue = segments[segments.length - 1].v;
+    segments.push({ t: maxT, v: lastValue });
+
+    const d = segments.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+    if (!d) return "";
+    const color = cfg.color || "#66bb6a";
+    const width = Math.max(0.5, Number(cfg.line_width) || 1.2);
+    const opacity = Math.max(0, Math.min(1, Number(cfg.opacity) || 0.95));
+    return `<path class="target-temperature-line" d="${d}" fill="none" stroke="${this._escape(color)}" stroke-opacity="${opacity.toFixed(3)}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none" />`;
   }
 
   _queueRender() {
@@ -889,6 +953,14 @@ class LokioClimateCard extends HTMLElement {
     let maxV = Math.max(...points.map((p) => p.v));
     const rawMinV = minV;
     const rawMaxV = maxV;
+    const targetCfg = this._config.graph.activity?.target_temperature || {};
+    const targetValues = this._activityEnabled() && targetCfg.enabled !== false && this._activityHistoryRoomId === this._currentRoom()?.id
+      ? (this._activityHistory.target || []).filter((p) => p.t >= minT && p.t <= maxT && Number.isFinite(p.v)).map((p) => p.v)
+      : [];
+    if (targetValues.length) {
+      minV = Math.min(minV, ...targetValues);
+      maxV = Math.max(maxV, ...targetValues);
+    }
     const valueRange = maxV - minV;
     const visualPad = valueRange > 0 ? valueRange * 0.10 : 0.5;
     minV -= visualPad;
@@ -925,6 +997,7 @@ class LokioClimateCard extends HTMLElement {
     const showExtrema = this._config.graph.show_extrema !== false;
     const activityEnabled = this._activityEnabled();
     const activityRects = this._activityRects(minT, maxT, w, h);
+    const targetTemperaturePath = activityEnabled ? this._targetTemperaturePath(minT, maxT, x, y) : "";
 
     const timeLabelCountRaw = Number(this._config.graph.time_labels);
     const timeLabelCount = Number.isFinite(timeLabelCountRaw)
@@ -981,6 +1054,7 @@ class LokioClimateCard extends HTMLElement {
           </g>
         </g>`}
         ${activityRects ? `<g clip-path="url(#lokio-graph-area-clip)">${activityRects}</g>` : ""}
+        ${targetTemperaturePath ? `<g mask="url(#lokio-edge-mask)">${targetTemperaturePath}</g>` : ""}
         <g mask="url(#lokio-edge-mask)">
           <path d="${line}" fill="none" stroke="${color}" stroke-width="${Number(this._config.graph.line_width) || 2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
         </g>
