@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.22
+ * v0.3.23
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.22";
+const VERSION = "0.3.23";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -78,8 +78,11 @@ class LokioClimateCard extends HTMLElement {
     this._historyLoading = false;
     this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
     this._activityHistoryRoomId = null;
-    this._activityFetchedAt = 0;
-    this._activityLoading = false;
+    // Activity history is cached per room. A single global activity buffer caused
+    // races when switching rooms while another room's history request was still
+    // in flight (most visible as a missing target-temperature line).
+    this._activityHistoryByRoom = new Map();
+    this._activityLoadingRooms = new Set();
     this._renderQueued = false;
     this._holdTimer = null;
     this._holdTriggered = false;
@@ -309,8 +312,9 @@ class LokioClimateCard extends HTMLElement {
 
     this._history = [];
     this._historyEntity = null;
-    this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
-    this._activityHistoryRoomId = null;
+    const cachedActivity = this._activityHistoryByRoom.get(room?.id);
+    this._activityHistory = cachedActivity?.history || { ac: [], radiator: [], hrv: [], target: [] };
+    this._activityHistoryRoomId = cachedActivity ? room.id : null;
     this._saveUiState();
     this._queueRender();
     this._maybeLoadHistory(true);
@@ -386,28 +390,45 @@ class LokioClimateCard extends HTMLElement {
   }
 
   async _maybeLoadActivityHistory(force = false) {
-    if (!this._hass || !this._config || !this._activityEnabled() || this._activityLoading) return;
+    if (!this._hass || !this._config || !this._activityEnabled()) return;
 
     const room = this._currentRoom();
     if (!room) return;
 
+    const requestedRoomId = room.id;
     const activity = this._config.graph.activity || {};
     const wantAc = activity.ac?.enabled !== false && Boolean(room.ac);
     const wantRadiator = activity.radiator?.enabled !== false && Boolean(room.radiator);
     const wantHrv = activity.hrv?.enabled !== false && Boolean(room.hrv);
     const wantTarget = activity.target_temperature?.enabled !== false && Boolean(room.climate);
+
     if (!wantAc && !wantRadiator && !wantHrv && !wantTarget) {
-      this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
-      this._activityHistoryRoomId = room.id;
+      const history = { ac: [], radiator: [], hrv: [], target: [] };
+      this._activityHistoryByRoom.set(requestedRoomId, { history, fetchedAt: Date.now() });
+      if (this._currentRoom()?.id === requestedRoomId) {
+        this._activityHistory = history;
+        this._activityHistoryRoomId = requestedRoomId;
+      }
       return;
     }
 
     const refreshMs = Math.max(30, Number(this._config.graph.refresh_seconds) || 300) * 1000;
-    const stale = Date.now() - this._activityFetchedAt > refreshMs;
-    if (!force && this._activityHistoryRoomId === room.id && !stale) return;
+    const cached = this._activityHistoryByRoom.get(requestedRoomId);
+    const stale = !cached || Date.now() - cached.fetchedAt > refreshMs;
 
-    this._activityLoading = true;
-    const requestedRoomId = room.id;
+    if (!force && cached && !stale) {
+      if (this._currentRoom()?.id === requestedRoomId) {
+        this._activityHistory = cached.history;
+        this._activityHistoryRoomId = requestedRoomId;
+      }
+      return;
+    }
+
+    // Do not let a request for one room block another room. Each room gets an
+    // independent in-flight flag and cache entry.
+    if (this._activityLoadingRooms.has(requestedRoomId)) return;
+    this._activityLoadingRooms.add(requestedRoomId);
+
     try {
       const hours = Math.max(1, Number(this._config.graph.hours_to_show) || 24);
       const end = new Date();
@@ -442,6 +463,7 @@ class LokioClimateCard extends HTMLElement {
         t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
         v: Number(row.attributes?.temperature),
       })).filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v));
+
       const currentTarget = Number(this._hass?.states?.[room.climate]?.attributes?.temperature);
       if (wantTarget && Number.isFinite(currentTarget)) {
         const last = target[target.length - 1];
@@ -450,20 +472,31 @@ class LokioClimateCard extends HTMLElement {
         }
       }
 
+      const history = { ac, radiator, hrv, target };
+      this._activityHistoryByRoom.set(requestedRoomId, { history, fetchedAt: Date.now() });
+
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac, radiator, hrv, target };
+        this._activityHistory = history;
         this._activityHistoryRoomId = requestedRoomId;
-        this._activityFetchedAt = Date.now();
       }
     } catch (err) {
-      console.warn("Lokio Climate Card: activity history request failed", err);
+      console.warn(`Lokio Climate Card: activity history request failed for room ${requestedRoomId}`, err);
+      const history = { ac: [], radiator: [], hrv: [], target: [] };
+      this._activityHistoryByRoom.set(requestedRoomId, { history, fetchedAt: Date.now() });
       if (this._currentRoom()?.id === requestedRoomId) {
-        this._activityHistory = { ac: [], radiator: [], hrv: [], target: [] };
+        this._activityHistory = history;
         this._activityHistoryRoomId = requestedRoomId;
       }
     } finally {
-      this._activityLoading = false;
+      this._activityLoadingRooms.delete(requestedRoomId);
       this._queueRender();
+
+      // If the user switched rooms while this request was running, make sure
+      // the newly selected room starts its own request immediately.
+      const currentRoomId = this._currentRoom()?.id;
+      if (currentRoomId && currentRoomId !== requestedRoomId) {
+        this._maybeLoadActivityHistory(false);
+      }
     }
   }
 

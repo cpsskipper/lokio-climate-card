@@ -1,6 +1,6 @@
 {
   "name": "lokio-climate-card",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "description": "Standalone multi-room climate card for Home Assistant dashboards",
   "license": "MIT",
   "private": false,

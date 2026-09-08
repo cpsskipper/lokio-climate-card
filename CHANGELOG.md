@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.23
+
+- Fixed target-temperature history when switching between multiple rooms.
+- Activity/target history is now cached independently per room instead of using one shared global buffer.
+- Activity requests for one room no longer block another room, removing a race that could leave the target-temperature line missing.
+- Reuses cached activity history immediately when returning to a room.
+
+
 ## 0.3.22
 
 - Added optional fixed vertical graph scale via `graph.vertical_axis.min` and `max`.
