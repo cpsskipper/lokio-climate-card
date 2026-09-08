@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.23
+ * v0.3.24
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.23";
+const VERSION = "0.3.24";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -586,37 +586,65 @@ class LokioClimateCard extends HTMLElement {
   _targetTemperaturePath(minT, maxT, x, y) {
     if (!this._activityEnabled()) return "";
     const room = this._currentRoom();
-    if (!room || this._activityHistoryRoomId !== room.id) return "";
+    if (!room) return "";
     const cfg = this._config.graph.activity?.target_temperature || {};
-    if (cfg.enabled === false) return "";
+    if (cfg.enabled === false || !room.climate) return "";
 
-    const rows = Array.isArray(this._activityHistory.target)
-      ? this._activityHistory.target.filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v)).sort((a, b) => a.t - b.t)
-      : [];
-    if (!rows.length) return "";
+    // Read target history from the cache of the currently selected room instead
+    // of relying on the shared "active" buffer. This is important when several
+    // rooms are configured and requests finish in a different order.
+    const cached = this._activityHistoryByRoom.get(room.id)?.history;
+    const sourceRows = Array.isArray(cached?.target)
+      ? cached.target
+      : (this._activityHistoryRoomId === room.id && Array.isArray(this._activityHistory.target)
+          ? this._activityHistory.target
+          : []);
 
-    // Target temperature is a setpoint, so draw it as a step line: each value
-    // remains active until Home Assistant records the next target change.
-    const visible = rows.filter((row) => row.t <= maxT);
-    if (!visible.length) return "";
-    let current = visible[0];
-    for (const row of visible) {
-      if (row.t <= minT) current = row;
+    const rows = sourceRows
+      .filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v))
+      .sort((a, b) => a.t - b.t);
+
+    // Always have a usable fallback. Home Assistant may return no historical
+    // climate attributes for a period even though the current setpoint exists.
+    const currentTarget = Number(this._hass?.states?.[room.climate]?.attributes?.temperature);
+    if (!rows.length && !Number.isFinite(currentTarget)) return "";
+
+    // Find the value that was active at the left edge. Prefer the latest
+    // historical setpoint at/before minT; otherwise use the first historical
+    // value, then the current setpoint as a final fallback.
+    let startValue = Number.isFinite(currentTarget) ? currentTarget : null;
+    for (const row of rows) {
+      if (row.t <= minT) startValue = row.v;
       else break;
     }
+    if (!Number.isFinite(startValue) && rows.length) startValue = rows[0].v;
+    if (!Number.isFinite(startValue)) return "";
 
-    const segments = [{ t: minT, v: current.v }];
-    for (const row of visible) {
-      if (row.t <= minT || row.t > maxT) continue;
-      const prev = segments[segments.length - 1];
-      segments.push({ t: row.t, v: prev.v });
-      segments.push({ t: row.t, v: row.v });
+    const segments = [{ t: minT, v: startValue }];
+    let value = startValue;
+    for (const row of rows) {
+      if (row.t <= minT) {
+        value = row.v;
+        continue;
+      }
+      if (row.t > maxT) break;
+      // Horizontal part up to the change, then a vertical setpoint change.
+      segments.push({ t: row.t, v: value });
+      value = row.v;
+      segments.push({ t: row.t, v: value });
     }
-    const lastValue = segments[segments.length - 1].v;
-    segments.push({ t: maxT, v: lastValue });
 
-    const d = segments.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+    // If the latest live target differs from the last historical value, use the
+    // live value for the right edge. This also makes the line visible instantly
+    // after a target-temperature change, before Recorder catches up.
+    if (Number.isFinite(currentTarget)) value = currentTarget;
+    segments.push({ t: maxT, v: value });
+
+    const d = segments
+      .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`)
+      .join(" ");
     if (!d) return "";
+
     const color = cfg.color || "#66bb6a";
     const width = Math.max(0.5, Number(cfg.line_width) || 1.2);
     const opacity = Math.max(0, Math.min(1, Number(cfg.opacity) || 0.95));
@@ -993,9 +1021,13 @@ class LokioClimateCard extends HTMLElement {
     const rawMinV = minV;
     const rawMaxV = maxV;
     const targetCfg = this._config.graph.activity?.target_temperature || {};
-    const targetValues = this._activityEnabled() && targetCfg.enabled !== false && this._activityHistoryRoomId === this._currentRoom()?.id
-      ? (this._activityHistory.target || []).filter((p) => p.t >= minT && p.t <= maxT && Number.isFinite(p.v)).map((p) => p.v)
+    const currentRoom = this._currentRoom();
+    const cachedTargetRows = this._activityHistoryByRoom.get(currentRoom?.id)?.history?.target || [];
+    const targetValues = this._activityEnabled() && targetCfg.enabled !== false
+      ? cachedTargetRows.filter((p) => p.t >= minT && p.t <= maxT && Number.isFinite(p.v)).map((p) => p.v)
       : [];
+    const liveTarget = Number(this._hass?.states?.[currentRoom?.climate]?.attributes?.temperature);
+    if (this._activityEnabled() && targetCfg.enabled !== false && Number.isFinite(liveTarget)) targetValues.push(liveTarget);
     if (targetValues.length) {
       minV = Math.min(minV, ...targetValues);
       maxV = Math.max(maxV, ...targetValues);

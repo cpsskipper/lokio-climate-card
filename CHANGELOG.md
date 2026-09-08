@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.24
+
+- Fixed target-temperature line disappearing when multiple rooms are configured.
+- Target line now reads the selected room's own cached activity history instead of a shared active buffer.
+- Added a live setpoint fallback so the target line is drawn even when Recorder returns no historical temperature attribute rows.
+- Included the live setpoint in Y-axis range calculation.
+
 ## 0.3.23
 
 - Fixed target-temperature history when switching between multiple rooms.
