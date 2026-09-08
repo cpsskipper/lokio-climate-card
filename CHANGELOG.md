@@ -1,5 +1,11 @@
 # Changelog
 
+
+## 0.3.25
+
+- Fixed target-temperature line visibility: it is now rendered as the final SVG layer, above the sensor graph and activity fills.
+- Removed the edge mask from the target-temperature line to avoid SVG masking/render-order issues.
+
 ## 0.3.24
 
 - Fixed target-temperature line disappearing when multiple rooms are configured.
