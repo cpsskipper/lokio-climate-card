@@ -115,7 +115,7 @@ graph:
 
 `ac`, `radiator` and `hrv` may each point to either a `switch` or a `climate` entity. For a `climate` entity the card prefers historical `hvac_action`; AC supports `cooling`, `heating`, `drying` and `fan`, radiator uses `heating`, and HRV supports `cooling`, `heating` and `fan`. For a `switch`, `on` intervals are shaded. When historical `hvac_action` is unavailable, the card has a conservative fallback to the climate mode state. If `activity.enabled` is `false`, these extra history requests and activity layers are not used.
 
-While activity mode is enabled, the card also draws the historical target-temperature setpoint of the room's main `climate` entity as a step line. It is enabled by default inside activity mode and uses green (`#66bb6a`) by default. Configure it with `activity.target_temperature.enabled`, `color`, `line_width`, and `opacity`.
+While activity mode is enabled, the card draws a metric-aware climate setpoint step line. On the temperature graph it uses the room climate entity's `temperature` attribute. On the humidity graph it uses the `humidity` attribute only when that attribute is exposed by the climate entity. No setpoint line is drawn on CO2 or other sensor graphs. The line is enabled by default inside activity mode and uses green (`#66bb6a`) by default. Configure it with `activity.target_temperature.enabled`, `color`, `line_width`, and `opacity`.
 
 Optional AC colors are `on_color`, `cooling_color`, `heating_color`, `drying_color` and `fan_color`. `on_color` is used when `ac` is a switch. `activity.radiator.color` is used for both switch `on` intervals and climate `heating` intervals. HRV colors can be customized with `on_color`, `fan_color`, `cooling_color` and `heating_color`.
 

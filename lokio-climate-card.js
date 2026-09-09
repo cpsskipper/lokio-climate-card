@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.25
+ * v0.3.26
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.25";
+const VERSION = "0.3.26";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -459,17 +459,24 @@ class LokioClimateCard extends HTMLElement {
       const ac = mapRows(acRows, acDomain);
       const radiator = mapRows(radiatorRows, radiatorDomain);
       const hrv = mapRows(hrvRows, hrvDomain);
+      // Keep both supported climate setpoints in the same history stream.
+      // The renderer chooses the one that matches the currently selected graph:
+      // temperature -> attributes.temperature, humidity -> attributes.humidity.
       const target = targetRows.map((row) => ({
         t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
-        v: Number(row.attributes?.temperature),
-      })).filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v));
+        temperature: Number(row.attributes?.temperature),
+        humidity: Number(row.attributes?.humidity),
+      })).filter((row) => Number.isFinite(row.t));
 
-      const currentTarget = Number(this._hass?.states?.[room.climate]?.attributes?.temperature);
-      if (wantTarget && Number.isFinite(currentTarget)) {
-        const last = target[target.length - 1];
-        if (!last || last.v !== currentTarget || last.t < end.getTime() - 1000) {
-          target.push({ t: end.getTime(), v: currentTarget });
-        }
+      const climateAttrs = this._hass?.states?.[room.climate]?.attributes || {};
+      const currentTemperatureTarget = Number(climateAttrs.temperature);
+      const currentHumidityTarget = Number(climateAttrs.humidity);
+      if (wantTarget && (Number.isFinite(currentTemperatureTarget) || Number.isFinite(currentHumidityTarget))) {
+        target.push({
+          t: end.getTime(),
+          temperature: currentTemperatureTarget,
+          humidity: currentHumidityTarget,
+        });
       }
 
       const history = { ac, radiator, hrv, target };
@@ -590,9 +597,24 @@ class LokioClimateCard extends HTMLElement {
     const cfg = this._config.graph.activity?.target_temperature || {};
     if (cfg.enabled === false || !room.climate) return "";
 
-    // Read target history from the cache of the currently selected room instead
-    // of relying on the shared "active" buffer. This is important when several
-    // rooms are configured and requests finish in a different order.
+    // A target line only makes sense for the metric currently being graphed.
+    // Temperature uses climate.attributes.temperature. Humidity uses
+    // climate.attributes.humidity, but only when the thermostat exposes it.
+    // CO2 and custom metrics intentionally have no climate target line.
+    let targetKey = null;
+    if (this._selectedMetric === "temperature") targetKey = "temperature";
+    if (this._selectedMetric === "humidity") targetKey = "humidity";
+    if (!targetKey) return "";
+
+    const climateAttrs = this._hass?.states?.[room.climate]?.attributes || {};
+    const currentTarget = Number(climateAttrs[targetKey]);
+    const hasCurrentTarget = Number.isFinite(currentTarget);
+
+    // For humidity, the presence of a finite `humidity` attribute is what tells
+    // us this climate entity supports a target humidity. Do not draw a line on
+    // ordinary thermostats that only expose current humidity elsewhere.
+    if (targetKey === "humidity" && !hasCurrentTarget) return "";
+
     const cached = this._activityHistoryByRoom.get(room.id)?.history;
     const sourceRows = Array.isArray(cached?.target)
       ? cached.target
@@ -601,18 +623,13 @@ class LokioClimateCard extends HTMLElement {
           : []);
 
     const rows = sourceRows
+      .map((row) => ({ t: row.t, v: Number(row?.[targetKey]) }))
       .filter((row) => Number.isFinite(row.t) && Number.isFinite(row.v))
       .sort((a, b) => a.t - b.t);
 
-    // Always have a usable fallback. Home Assistant may return no historical
-    // climate attributes for a period even though the current setpoint exists.
-    const currentTarget = Number(this._hass?.states?.[room.climate]?.attributes?.temperature);
-    if (!rows.length && !Number.isFinite(currentTarget)) return "";
+    if (!rows.length && !hasCurrentTarget) return "";
 
-    // Find the value that was active at the left edge. Prefer the latest
-    // historical setpoint at/before minT; otherwise use the first historical
-    // value, then the current setpoint as a final fallback.
-    let startValue = Number.isFinite(currentTarget) ? currentTarget : null;
+    let startValue = hasCurrentTarget ? currentTarget : null;
     for (const row of rows) {
       if (row.t <= minT) startValue = row.v;
       else break;
@@ -628,16 +645,12 @@ class LokioClimateCard extends HTMLElement {
         continue;
       }
       if (row.t > maxT) break;
-      // Horizontal part up to the change, then a vertical setpoint change.
       segments.push({ t: row.t, v: value });
       value = row.v;
       segments.push({ t: row.t, v: value });
     }
 
-    // If the latest live target differs from the last historical value, use the
-    // live value for the right edge. This also makes the line visible instantly
-    // after a target-temperature change, before Recorder catches up.
-    if (Number.isFinite(currentTarget)) value = currentTarget;
+    if (hasCurrentTarget) value = currentTarget;
     segments.push({ t: maxT, v: value });
 
     const d = segments
@@ -1022,13 +1035,23 @@ class LokioClimateCard extends HTMLElement {
     const rawMaxV = maxV;
     const targetCfg = this._config.graph.activity?.target_temperature || {};
     const currentRoom = this._currentRoom();
+    const targetKey = this._selectedMetric === "temperature"
+      ? "temperature"
+      : (this._selectedMetric === "humidity" ? "humidity" : null);
     const cachedTargetRows = this._activityHistoryByRoom.get(currentRoom?.id)?.history?.target || [];
-    const targetValues = this._activityEnabled() && targetCfg.enabled !== false
-      ? cachedTargetRows.filter((p) => p.t >= minT && p.t <= maxT && Number.isFinite(p.v)).map((p) => p.v)
+    const liveTarget = targetKey
+      ? Number(this._hass?.states?.[currentRoom?.climate]?.attributes?.[targetKey])
+      : NaN;
+    const targetValues = this._activityEnabled() && targetCfg.enabled !== false && targetKey
+      ? cachedTargetRows
+          .filter((p) => p.t >= minT && p.t <= maxT && Number.isFinite(Number(p?.[targetKey])))
+          .map((p) => Number(p[targetKey]))
       : [];
-    const liveTarget = Number(this._hass?.states?.[currentRoom?.climate]?.attributes?.temperature);
-    if (this._activityEnabled() && targetCfg.enabled !== false && Number.isFinite(liveTarget)) targetValues.push(liveTarget);
-    if (targetValues.length) {
+    // Humidity target is included only when the climate entity currently exposes
+    // attributes.humidity; temperature keeps the existing historical fallback.
+    const canUseTarget = targetKey === "temperature" || Number.isFinite(liveTarget);
+    if (canUseTarget && Number.isFinite(liveTarget)) targetValues.push(liveTarget);
+    if (canUseTarget && targetValues.length) {
       minV = Math.min(minV, ...targetValues);
       maxV = Math.max(maxV, ...targetValues);
     }

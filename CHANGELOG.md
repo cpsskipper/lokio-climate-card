@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.26
+
+- Target setpoint line is now metric-aware.
+- The climate `temperature` setpoint is drawn only on the temperature graph.
+- The target line is hidden on CO2 and other non-temperature/non-humidity graphs.
+- If the room climate entity exposes a numeric `humidity` attribute, its historical target humidity is drawn on the humidity graph.
+- Target temperature and target humidity share the existing `graph.activity.target_temperature` styling settings.
 
 ## 0.3.25
 
