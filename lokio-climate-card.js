@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.26
+ * v0.3.27
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.26";
+const VERSION = "0.3.27";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -1172,7 +1172,7 @@ class LokioClimateCard extends HTMLElement {
         ${targetTemperaturePath ? `<g class="target-temperature-layer">${targetTemperaturePath}</g>` : ""}
       </svg>
       ${verticalAxisLabels}
-      ${timeLabels ? `<div class="graph-time-axis" style="--time-label-count:${timeLabelCount}">${timeLabels}</div>` : ""}`;
+      ${timeLabels ? `<div class="graph-time-axis${showVerticalAxis ? " has-y-axis" : ""}" style="--time-label-count:${timeLabelCount}">${timeLabels}</div>` : ""}`;
   }
 
   _render() {
@@ -1357,6 +1357,7 @@ class LokioClimateCard extends HTMLElement {
       .graph-time-axis { position:absolute; left:-8px; right:-12px; bottom:4px; display:grid; grid-template-columns:repeat(var(--time-label-count), minmax(0,1fr)); align-items:end; pointer-events:none; color:var(--lokio-button-card-state-color, var(--secondary-text-color)); font-size:9px; font-weight:400; line-height:10px; opacity:.82; z-index:3; }
       .graph-time-axis span { min-width:0; text-align:center; white-space:nowrap; }
       .graph-time-axis span:first-child { text-align:left; padding-left:6px; }
+      .graph-time-axis.has-y-axis span:first-child { padding-left:28px; }
       .graph-time-axis span:last-child { text-align:right; }
       .graph-empty { height:145px; display:flex; align-items:center; justify-content:center; color:var(--secondary-text-color); font-size:11px; opacity:.7; }
       .target { grid-area:target; transform:translate(8px, -22px); height:140px; align-self:center; display:grid; grid-template-rows:38px 38px 25px 38px; row-gap:2px; justify-items:center; align-items:center; }

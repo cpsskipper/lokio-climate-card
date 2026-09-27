@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.27
+
+- Shifted the first time-axis label to the right when `graph.vertical_axis.show: true`, preventing overlap with the lower Y-axis label.
+
 ## 0.3.26
 
 - Target setpoint line is now metric-aware.
