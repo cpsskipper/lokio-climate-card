@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.28
+
+- Shifted the first time-axis label farther right when `graph.vertical_axis.show: true`.
+- Improved automatic Y-axis scaling: isolated extreme samples no longer flatten the useful graph range.
+- Auto scaling uses the central 90% of values when at least 20 samples are available; source graph points and Min/Max extrema remain unchanged.
+- Explicit `graph.vertical_axis.min` / `max` values still take absolute priority.
+
 ## 0.3.27
 
 - Shifted the first time-axis label to the right when `graph.vertical_axis.show: true`, preventing overlap with the lower Y-axis label.

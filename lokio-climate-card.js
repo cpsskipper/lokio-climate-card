@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.27
+ * v0.3.28
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.27";
+const VERSION = "0.3.28";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -1029,10 +1029,34 @@ class LokioClimateCard extends HTMLElement {
     const minT = useDataDomain ? dataMinT : configuredStartT;
     const maxT = useDataDomain ? dataMaxT : configuredEndT;
 
-    let minV = Math.min(...points.map((p) => p.v));
-    let maxV = Math.max(...points.map((p) => p.v));
-    const rawMinV = minV;
-    const rawMaxV = maxV;
+    // Keep the real extrema for the Min/Max labels, but use a robust range for
+    // automatic Y scaling. A single bad Recorder sample must not flatten the
+    // useful part of the graph. The source points themselves are NOT filtered.
+    const graphValuePoints = points.filter((p) => p.t >= minT && p.t <= maxT);
+    const scaleValues = (graphValuePoints.length >= 2 ? graphValuePoints : points)
+      .map((p) => p.v)
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
+    const rawMinV = Math.min(...points.map((p) => p.v));
+    const rawMaxV = Math.max(...points.map((p) => p.v));
+    const percentile = (values, q) => {
+      if (!values.length) return NaN;
+      if (values.length === 1) return values[0];
+      const pos = (values.length - 1) * q;
+      const lo = Math.floor(pos);
+      const hi = Math.ceil(pos);
+      if (lo === hi) return values[lo];
+      const f = pos - lo;
+      return values[lo] + (values[hi] - values[lo]) * f;
+    };
+    // With enough samples, trim only the outer 5% for scale calculation.
+    // Small histories keep their exact range to avoid surprising zoom.
+    let minV = scaleValues.length >= 20 ? percentile(scaleValues, 0.05) : scaleValues[0];
+    let maxV = scaleValues.length >= 20 ? percentile(scaleValues, 0.95) : scaleValues[scaleValues.length - 1];
+    if (!Number.isFinite(minV) || !Number.isFinite(maxV)) {
+      minV = rawMinV;
+      maxV = rawMaxV;
+    }
     const targetCfg = this._config.graph.activity?.target_temperature || {};
     const currentRoom = this._currentRoom();
     const targetKey = this._selectedMetric === "temperature"
@@ -1357,7 +1381,7 @@ class LokioClimateCard extends HTMLElement {
       .graph-time-axis { position:absolute; left:-8px; right:-12px; bottom:4px; display:grid; grid-template-columns:repeat(var(--time-label-count), minmax(0,1fr)); align-items:end; pointer-events:none; color:var(--lokio-button-card-state-color, var(--secondary-text-color)); font-size:9px; font-weight:400; line-height:10px; opacity:.82; z-index:3; }
       .graph-time-axis span { min-width:0; text-align:center; white-space:nowrap; }
       .graph-time-axis span:first-child { text-align:left; padding-left:6px; }
-      .graph-time-axis.has-y-axis span:first-child { padding-left:28px; }
+      .graph-time-axis.has-y-axis span:first-child { padding-left:44px; }
       .graph-time-axis span:last-child { text-align:right; }
       .graph-empty { height:145px; display:flex; align-items:center; justify-content:center; color:var(--secondary-text-color); font-size:11px; opacity:.7; }
       .target { grid-area:target; transform:translate(8px, -22px); height:140px; align-self:center; display:grid; grid-template-rows:38px 38px 25px 38px; row-gap:2px; justify-items:center; align-items:center; }
