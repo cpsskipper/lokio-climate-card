@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.34
+ * v0.3.35
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.34";
+const VERSION = "0.3.35";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -379,53 +379,6 @@ class LokioClimateCard extends HTMLElement {
 
   _entityDomain(entityId) {
     return String(entityId || "").split(".", 1)[0] || "";
-  }
-
-  async _fetchHistoryRows(entityId, start, end, includeAttributes = false) {
-    if (!entityId) return [];
-    const noAttributes = includeAttributes ? "" : "&no_attributes";
-    const path = `history/period/${encodeURIComponent(start.toISOString())}?filter_entity_id=${encodeURIComponent(entityId)}&end_time=${encodeURIComponent(end.toISOString())}${noAttributes}`;
-    const response = await this._hass.callApi("GET", path);
-    return Array.isArray(response?.[0]) ? response[0] : [];
-  }
-
-  async _exportHrvHistory() {
-    const room = this._currentRoom();
-    const entityId = room?.hrv;
-    if (!this._hass || !entityId) return;
-
-    try {
-      const hours = Math.max(1, Number(this._config.graph?.hours_to_show) || 24);
-      const end = new Date();
-      const start = new Date(end.getTime() - hours * 3600 * 1000);
-      const domain = this._entityDomain(entityId);
-      const rows = await this._fetchHistoryRows(entityId, start, end, domain === "climate");
-      const payload = {
-        export_version: "1",
-        card_version: VERSION,
-        exported_at: end.toISOString(),
-        room_id: room.id,
-        room_name: room.name,
-        entity_id: entityId,
-        domain,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        current_state: this._hass.states?.[entityId] || null,
-        rows,
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `lokio-hrv-history-${String(room.id || "room").replace(/[^a-z0-9_-]+/gi, "_")}-${end.toISOString().replace(/[:.]/g, "-")}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      console.error("Lokio Climate Card: HRV history export failed", err);
-      alert("Не удалось выгрузить историю HRV. Подробности смотри в консоли браузера.");
-    }
   }
 
   async _maybeLoadActivityHistory(force = false) {
@@ -1420,11 +1373,6 @@ class LokioClimateCard extends HTMLElement {
             </div>` : ""}
         </div>
       </ha-card>
-      ${this._config.debug?.history && room.hrv ? `
-        <div class="debug-tools">
-          <button class="debug-export" id="export-hrv-history">Выгрузить историю HRV</button>
-          <span class="debug-hint">${this._escape(room.hrv)} · ${this._escape(String(this._config.graph.hours_to_show || 24))} ч</span>
-        </div>` : ""}
       ${roomButtons}
     `;
 
@@ -1448,8 +1396,6 @@ class LokioClimateCard extends HTMLElement {
       el.onclick = () => this._changeTarget(Number(el.dataset.targetDelta));
     });
 
-    const exportHrvButton = this.shadowRoot.getElementById("export-hrv-history");
-    if (exportHrvButton) exportHrvButton.onclick = () => this._exportHrvHistory();
 
     this._bindLongPress(
       this.shadowRoot.getElementById("header"),
@@ -1538,9 +1484,6 @@ class LokioClimateCard extends HTMLElement {
       .difference.negative { color:#4fc3f7; background:color-mix(in srgb, #4fc3f7 22%, transparent); }
       .difference.positive { color:#ff9d45; background:color-mix(in srgb, #ff9d45 25%, transparent); }
       .difference.neutral { color:var(--lokio-climate-difference-color, var(--secondary-text-color)); background:var(--lokio-climate-difference-background, color-mix(in srgb, var(--primary-text-color) 6%, transparent)); }
-      .debug-tools { display:flex; align-items:center; gap:8px; margin:6px 0 0; padding:0 2px; }
-      .debug-export { border:1px solid var(--divider-color); border-radius:8px; padding:6px 10px; background:var(--ha-card-background, var(--card-background-color)); cursor:pointer; font-size:12px; }
-      .debug-hint { font-size:11px; color:var(--secondary-text-color); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .room-grid { margin-top:8px; display:grid; grid-template-columns:repeat(var(--room-columns, 4), minmax(0,1fr)); gap:8px; }
       .room-button { height:50px; padding:6px; border-radius:10px; background:var(--lokio-button-card-background-color, var(--ha-card-background, var(--card-background-color))); box-shadow:none; border:1px solid var(--lokio-climate-control-border, var(--divider-color)); display:grid; grid-template-areas:"name icon" "temp temp"; grid-template-columns:minmax(0,1fr) 26px; grid-template-rows:20px 1fr; row-gap:2px; cursor:pointer; text-align:left; }
       .room-button.selected { border:2px solid var(--primary-color); }

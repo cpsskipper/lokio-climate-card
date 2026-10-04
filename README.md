@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.31**
+**Current version: 0.3.35**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -206,6 +206,84 @@ hrv_colors:
 ```
 
 Fixed `ac_icon`/`ac_color` values take priority over the state maps. Radiator and HRV options behave the same way.
+
+## Complete example
+
+The following example enables the time axis, vertical axis, activity shading, target setpoint line, and all three device types. It also demonstrates `climate` entities for AC/radiator/HRV as well as `switch` entities.
+
+```yaml
+type: custom:lokio-climate-card
+storage_key: main_climate
+room_columns: 4
+reset_metric_on_room_change: false
+
+graph:
+  hours_to_show: 24
+  points: 120
+  smoothing: 0.1
+  time_labels: 5
+  line_width: 1
+  show_extrema: true
+  vertical_axis:
+    show: true
+    min: 18
+    max: 28
+  activity:
+    enabled: true
+    target_temperature:
+      enabled: true
+      color: "#00BFFF"
+      line_width: 1
+      opacity: 0.4
+    ac:
+      enabled: true
+      opacity: 0.12
+    radiator:
+      enabled: true
+      opacity: 0.12
+    hrv:
+      enabled: true
+      opacity: 0.12
+
+rooms:
+  - id: living_room
+    name: Living room
+    climate: climate.living_room
+    sensors:
+      temperature: sensor.living_room_temperature
+      humidity: sensor.living_room_humidity
+      co2: sensor.living_room_co2
+    ac: climate.living_room_ac
+    ac_icon: mdi:snowflake
+    radiator: switch.living_room_radiator
+    radiator_icon: mdi:radiator
+    hrv: switch.living_room_hrv
+    hrv_icon: mdi:fan
+    reason: input_text.living_room_climate_reason
+    target_temperature_visible: true
+
+  - id: bedroom
+    name: Bedroom
+    climate: climate.bedroom
+    sensors:
+      temperature: sensor.bedroom_temperature
+      humidity: sensor.bedroom_humidity
+    ac: climate.bedroom_ac
+    radiator: climate.bedroom_radiator
+    target_temperature_visible: true
+
+  - id: ventilation
+    name: Ventilation
+    climate: climate.ventilation
+    sensors:
+      temperature: sensor.ventilation_temperature
+      humidity: sensor.ventilation_humidity
+    hrv: climate.ventilation
+    hrv_icon: mdi:fan
+    target_temperature_visible: false
+```
+
+For a single-room card, simply configure one item under `rooms`; the room selector is hidden automatically.
 
 ## Local UI state
 

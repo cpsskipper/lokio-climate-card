@@ -1,17 +1,17 @@
 # Changelog
 
+## 0.3.35
+
+- Removed the temporary HRV history debug exporter and all related debug UI/code.
+- Updated README with current release information and complete configuration examples.
+- Kept the activity-fill continuity fix from 0.3.34: adjacent active history intervals are rendered as continuous areas without false visual gaps.
+
 ## 0.3.34
 - Fixed activity fill rendering: consecutive history samples with the same active state are merged into continuous SVG intervals.
 - Prevented fractional-pixel seams between adjacent activity rectangles from appearing as false interruptions.
 - No changes to activity state detection: climate activity still uses `hvac_mode`/entity state, with `hvac_action` only assisting color selection for composite modes.
 
 # Changelog
-
-## 0.3.33-debug
-
-- Added a temporary HRV history export button enabled by `debug.history: true`.
-- The export downloads the raw Home Assistant Recorder history rows for the selected room's `hrv` entity, including climate attributes.
-- Updated the embedded card build version to `0.3.33-debug`.
 
 
 ## 0.3.31
