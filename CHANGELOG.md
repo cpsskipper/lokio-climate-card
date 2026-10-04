@@ -1,10 +1,15 @@
 # Changelog
 
-## 0.3.29
+## 0.3.30
 
-- Fixed activity shading gaps caused by Home Assistant Recorder rows that contain attribute-only updates without `hvac_action`.
-- Activity rendering now carries forward the last known climate `hvac_action` when the action is omitted, while still respecting explicit `idle` and `off` states.
-- This prevents continuous heating/cooling/fan periods from appearing as repeated device shutdowns on the graph.
+- Повышен номер версии сборки после исправления логики activity для climate-устройств.
+
+
+
+- Fixed activity shading so climate devices follow their stable operating mode (`heat`, `cool`, `fan_only`, etc.) instead of treating normal `hvac_action: idle` duty-cycle periods as device shutdowns.
+- Historical climate rows now carry forward the last active `hvac_action` through missing/idle attribute updates.
+- Explicit `off` climate state and `off` switch state still stop the activity band.
+- This prevents continuous heating/cooling/ventilation periods from being split into false gaps on the graph.
 
 ## 0.3.28
 

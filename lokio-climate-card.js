@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.29
+ * v0.3.30
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.29";
+const VERSION = "0.3.30";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -463,21 +463,25 @@ class LokioClimateCard extends HTMLElement {
           .map((row) => {
             const state = row.state || "";
             const rawAction = String(row.attributes?.hvac_action || "").trim();
-            const isExplicitInactive = rawAction === "idle" || rawAction === "off" || state === "off";
+            // For activity shading we want the operating MODE history, not the
+            // thermostat's short compressor/burner duty cycle. Home Assistant may
+            // report hvac_action=idle for a while while the climate entity remains
+            // in heat/cool/fan_only mode. The native HA history treats that as one
+            // continuous mode interval, so do the same here.
+            const isOff = state === "off";
+            const isInactiveAction = rawAction === "idle" || rawAction === "off";
 
             let action = rawAction;
-            if (!action && domain === "climate" && !isExplicitInactive) {
-              // Keep the last known hvac_action through attribute-only Recorder
-              // rows. This is important for long heating/cooling/fan periods.
-              action = lastAction;
+            if (domain === "climate") {
+              if (rawAction && !isInactiveAction) {
+                lastAction = rawAction;
+              } else if (!rawAction || isInactiveAction) {
+                // Carry the last active action through missing/idle attribute rows.
+                action = lastAction;
+              }
+              if (isOff) lastAction = "off";
             }
 
-            if (rawAction) lastAction = rawAction;
-            else if (domain === "climate" && state !== lastState && !isExplicitInactive && !lastAction) {
-              // First row (or a row after a restart) may have no hvac_action.
-              // The caller's renderer has a conservative mode-state fallback.
-              action = "";
-            }
             if (state === "off") lastAction = "off";
             lastState = state;
 
@@ -577,16 +581,24 @@ class LokioClimateCard extends HTMLElement {
         if (row.domain === "switch") {
           return row.state === "on" ? { color: cfg.ac.on_color || cfg.ac.cooling_color || "#4fc3f7", opacity } : null;
         }
+
+        // Climate activity follows the climate MODE. hvac_action can legitimately
+        // become "idle" between compressor/heater cycles without the AC being
+        // switched off. Prefer the stable mode so those duty-cycle changes do not
+        // create false gaps in the activity band.
+        if (row.state === "off") return null;
+        if (row.state === "cool") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
+        if (row.state === "heat") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
+        if (row.state === "dry") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
+        if (row.state === "fan_only") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
+
+        // Auto/heat_cool modes still use hvac_action for the color, but an idle
+        // action has already been carried forward by mapRows().
         const action = row.action || "";
         if (action === "cooling") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
         if (action === "heating") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
         if (action === "drying") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
         if (action === "fan") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
-        // Fallback for climate history where hvac_action is unavailable.
-        if (!action && row.state === "cool") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
-        if (!action && row.state === "heat") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
-        if (!action && row.state === "dry") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
-        if (!action && row.state === "fan_only") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
         return null;
       });
     }
@@ -597,10 +609,9 @@ class LokioClimateCard extends HTMLElement {
         if (row.domain === "switch") {
           return row.state === "on" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
         }
-        const action = row.action || "";
-        if (action === "heating") return { color: cfg.radiator.color || "#ff9d45", opacity };
-        // Fallback for climate history that does not contain hvac_action.
-        return !action && row.state === "heat" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
+        if (row.state === "off") return null;
+        if (row.state === "heat") return { color: cfg.radiator.color || "#ff9d45", opacity };
+        return (row.action || "") === "heating" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
       });
     }
 
@@ -610,14 +621,14 @@ class LokioClimateCard extends HTMLElement {
         if (row.domain === "switch") {
           return row.state === "on" ? { color: cfg.hrv.on_color || cfg.hrv.fan_color || "#66bb6a", opacity } : null;
         }
+        if (row.state === "off") return null;
+        if (["fan_only", "auto", "heat_cool"].includes(row.state)) {
+          return { color: cfg.hrv.fan_color || cfg.hrv.on_color || "#66bb6a", opacity };
+        }
         const action = row.action || "";
         if (action === "cooling") return { color: cfg.hrv.cooling_color || "#4fc3f7", opacity };
         if (action === "heating") return { color: cfg.hrv.heating_color || "#ffb74d", opacity };
         if (action === "fan") return { color: cfg.hrv.fan_color || "#4dd0e1", opacity };
-        // Fallback for climate HRV entities without historical hvac_action.
-        if (!action && ["fan_only", "auto", "heat_cool"].includes(row.state)) {
-          return { color: cfg.hrv.fan_color || cfg.hrv.on_color || "#66bb6a", opacity };
-        }
         return null;
       });
     }
