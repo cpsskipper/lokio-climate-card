@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.32-debug
+- Добавлен временный диагностический экспорт сырой истории HRV/climate/температурного датчика в JSON.
+- Экспорт включает attributes и период `graph.hours_to_show`.
+
+
 ## 0.3.31
 
 - Activity shading for climate entities is now driven by the climate state (`hvac_mode`) rather than `hvac_action`.
