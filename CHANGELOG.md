@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.29
+
+- Fixed activity shading gaps caused by Home Assistant Recorder rows that contain attribute-only updates without `hvac_action`.
+- Activity rendering now carries forward the last known climate `hvac_action` when the action is omitted, while still respecting explicit `idle` and `off` states.
+- This prevents continuous heating/cooling/fan periods from appearing as repeated device shutdowns on the graph.
+
 ## 0.3.28
 
 - Shifted the first time-axis label farther right when `graph.vertical_axis.show: true`.

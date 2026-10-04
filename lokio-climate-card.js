@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.28
+ * v0.3.29
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.28";
+const VERSION = "0.3.29";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -449,12 +449,47 @@ class LokioClimateCard extends HTMLElement {
       const hrvRows = hrvResult.status === "fulfilled" ? hrvResult.value : [];
       const targetRows = targetResult.status === "fulfilled" ? targetResult.value : [];
 
-      const mapRows = (rows, domain) => rows.map((row) => ({
-        t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
-        state: row.state || "",
-        action: row.attributes?.hvac_action || "",
-        domain,
-      })).filter((row) => Number.isFinite(row.t));
+      const mapRows = (rows, domain) => {
+        // Recorder may return rows created by attribute-only updates where
+        // `hvac_action` is temporarily absent even though the climate device
+        // is still performing the same activity. Treat an omitted action as
+        // "unchanged" instead of creating a false inactive gap in the graph.
+        // An explicit `idle`/`off` action is still respected and stops the
+        // interval normally.
+        let lastAction = "";
+        let lastState = "";
+
+        return rows
+          .map((row) => {
+            const state = row.state || "";
+            const rawAction = String(row.attributes?.hvac_action || "").trim();
+            const isExplicitInactive = rawAction === "idle" || rawAction === "off" || state === "off";
+
+            let action = rawAction;
+            if (!action && domain === "climate" && !isExplicitInactive) {
+              // Keep the last known hvac_action through attribute-only Recorder
+              // rows. This is important for long heating/cooling/fan periods.
+              action = lastAction;
+            }
+
+            if (rawAction) lastAction = rawAction;
+            else if (domain === "climate" && state !== lastState && !isExplicitInactive && !lastAction) {
+              // First row (or a row after a restart) may have no hvac_action.
+              // The caller's renderer has a conservative mode-state fallback.
+              action = "";
+            }
+            if (state === "off") lastAction = "off";
+            lastState = state;
+
+            return {
+              t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
+              state,
+              action,
+              domain,
+            };
+          })
+          .filter((row) => Number.isFinite(row.t));
+      };
 
       const ac = mapRows(acRows, acDomain);
       const radiator = mapRows(radiatorRows, radiatorDomain);
