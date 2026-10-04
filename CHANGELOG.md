@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.36
+- Fixed activity history loading after the debug code was removed from the 0.3.35 release.
+- Restored the history API helper used by AC, radiator, HRV and target-temperature activity layers.
+- Activity fill is now rendered again without restoring any debug/export functionality.
+
+
 ## 0.3.35
 
 - Removed the temporary HRV history debug exporter and all related debug UI/code.

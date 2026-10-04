@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.35
+ * v0.3.36
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.35";
+const VERSION = "0.3.36";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -379,6 +379,14 @@ class LokioClimateCard extends HTMLElement {
 
   _entityDomain(entityId) {
     return String(entityId || "").split(".", 1)[0] || "";
+  }
+
+  async _fetchHistoryRows(entityId, start, end, includeAttributes = false) {
+    if (!entityId) return [];
+    const noAttributes = includeAttributes ? "" : "&no_attributes";
+    const path = `history/period/${encodeURIComponent(start.toISOString())}?filter_entity_id=${encodeURIComponent(entityId)}&end_time=${encodeURIComponent(end.toISOString())}${noAttributes}`;
+    const response = await this._hass.callApi("GET", path);
+    return Array.isArray(response?.[0]) ? response[0] : [];
   }
 
   async _maybeLoadActivityHistory(force = false) {
