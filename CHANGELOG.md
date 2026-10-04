@@ -1,15 +1,19 @@
 # Changelog
 
+## 0.3.31
+
+- Activity shading for climate entities is now driven by the climate state (`hvac_mode`) rather than `hvac_action`.
+- `hvac_action: idle` no longer creates artificial gaps while the climate remains in an active mode.
+- Composite modes such as `auto` and `heat_cool` use the last real `hvac_action` only to choose the activity color.
+- Transient `unknown` / `unavailable` climate history rows keep the previous active mode instead of breaking the activity band.
+- Explicit `hvac_mode: off` still ends the activity interval.
+- Updated documentation to describe the new climate activity logic.
+
 ## 0.3.30
 
-- Повышен номер версии сборки после исправления логики activity для climate-устройств.
-
-
-
-- Fixed activity shading so climate devices follow their stable operating mode (`heat`, `cool`, `fan_only`, etc.) instead of treating normal `hvac_action: idle` duty-cycle periods as device shutdowns.
-- Historical climate rows now carry forward the last active `hvac_action` through missing/idle attribute updates.
-- Explicit `off` climate state and `off` switch state still stop the activity band.
-- This prevents continuous heating/cooling/ventilation periods from being split into false gaps on the graph.
+- Fixed activity shading so climate devices follow their stable operating mode instead of treating normal `hvac_action: idle` duty-cycle periods as device shutdowns.
+- Activity history is cached independently per room.
+- Target-temperature history and activity rendering continue to use the selected room cache.
 
 ## 0.3.28
 

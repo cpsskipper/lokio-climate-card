@@ -2,7 +2,7 @@
 
 Standalone multi-room climate card for Home Assistant dashboards.
 
-**Current version: 0.3.30**
+**Current version: 0.3.31**
 
 Lokio Climate Card combines room selection, climate state, temperature/humidity/CO₂ sensors, target-temperature controls, device status and a Recorder history graph in one custom card. Selected room and graph metric are stored locally in the browser, so no helper entities or synchronization automation are required.
 
@@ -272,3 +272,7 @@ MIT. See [`LICENSE`](LICENSE).
 ### Activity graph fill
 
 > When activity mode is enabled, activity colors are clipped to the area below the selected sensor graph line; they do not fill the entire graph height.
+
+## Activity shading
+
+When `graph.activity.enabled: true`, climate activity is determined primarily from the climate entity state (`hvac_mode`). This avoids false gaps caused by short `hvac_action: idle` periods between heater/compressor cycles. For `auto` and `heat_cool`, `hvac_action` is used only to select the activity color; it is not treated as an on/off signal.

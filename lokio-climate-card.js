@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.30
+ * v0.3.31
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.30";
+const VERSION = "0.3.31";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -450,40 +450,49 @@ class LokioClimateCard extends HTMLElement {
       const targetRows = targetResult.status === "fulfilled" ? targetResult.value : [];
 
       const mapRows = (rows, domain) => {
-        // Recorder may return rows created by attribute-only updates where
-        // `hvac_action` is temporarily absent even though the climate device
-        // is still performing the same activity. Treat an omitted action as
-        // "unchanged" instead of creating a false inactive gap in the graph.
-        // An explicit `idle`/`off` action is still respected and stops the
-        // interval normally.
+        // Climate activity is based primarily on the climate entity STATE
+        // (`hvac_mode` in Home Assistant), not on `attributes.hvac_action`.
+        // `hvac_action` is a short-lived operational detail and can legitimately
+        // become `idle` while the climate remains in `heat`, `cool`, `auto`, etc.
+        // Using it as the on/off signal creates artificial gaps in long-running
+        // activity bands. We only use hvac_action to choose a color for composite
+        // modes such as `auto` / `heat_cool`.
         let lastAction = "";
-        let lastState = "";
+        let lastMode = "";
 
         return rows
           .map((row) => {
-            const state = row.state || "";
-            const rawAction = String(row.attributes?.hvac_action || "").trim();
-            // For activity shading we want the operating MODE history, not the
-            // thermostat's short compressor/burner duty cycle. Home Assistant may
-            // report hvac_action=idle for a while while the climate entity remains
-            // in heat/cool/fan_only mode. The native HA history treats that as one
-            // continuous mode interval, so do the same here.
-            const isOff = state === "off";
+            const rawState = String(row.state || "").trim().toLowerCase();
+            const rawAction = String(row.attributes?.hvac_action || "").trim().toLowerCase();
             const isInactiveAction = rawAction === "idle" || rawAction === "off";
 
+            let state = rawState;
             let action = rawAction;
-            if (domain === "climate") {
-              if (rawAction && !isInactiveAction) {
-                lastAction = rawAction;
-              } else if (!rawAction || isInactiveAction) {
-                // Carry the last active action through missing/idle attribute rows.
-                action = lastAction;
-              }
-              if (isOff) lastAction = "off";
-            }
 
-            if (state === "off") lastAction = "off";
-            lastState = state;
+            if (domain === "climate") {
+              // Explicit OFF always wins and terminates the previous interval.
+              if (rawState === "off") {
+                lastMode = "off";
+                lastAction = "off";
+              } else {
+                // Recorder can contain transient unknown/unavailable rows. Keep
+                // the previous mode through those rows so a temporary HA update
+                // does not create a false gap in the activity band.
+                if (rawState && rawState !== "unknown" && rawState !== "unavailable") {
+                  lastMode = rawState;
+                  state = rawState;
+                } else if (lastMode && lastMode !== "off") {
+                  state = lastMode;
+                }
+
+                // Remember only real actions. `idle` is deliberately NOT an
+                // activity stop signal for a climate entity.
+                if (rawAction && !isInactiveAction) {
+                  lastAction = rawAction;
+                }
+                action = !isInactiveAction && rawAction ? rawAction : lastAction;
+              }
+            }
 
             return {
               t: Date.parse(row.last_updated || row.last_changed || start.toISOString()),
@@ -582,23 +591,26 @@ class LokioClimateCard extends HTMLElement {
           return row.state === "on" ? { color: cfg.ac.on_color || cfg.ac.cooling_color || "#4fc3f7", opacity } : null;
         }
 
-        // Climate activity follows the climate MODE. hvac_action can legitimately
-        // become "idle" between compressor/heater cycles without the AC being
-        // switched off. Prefer the stable mode so those duty-cycle changes do not
-        // create false gaps in the activity band.
+        // Climate activity follows hvac_mode (the entity state). hvac_action is
+        // used only to select the color for composite modes. An `idle` action
+        // never creates a gap while the climate mode itself remains active.
         if (row.state === "off") return null;
         if (row.state === "cool") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
         if (row.state === "heat") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
         if (row.state === "dry") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
         if (row.state === "fan_only") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
 
-        // Auto/heat_cool modes still use hvac_action for the color, but an idle
-        // action has already been carried forward by mapRows().
+        // For auto / heat_cool, use the last real hvac_action when available.
+        // If HA reports idle, keep the band continuous with a neutral activity
+        // color instead of leaving the interval empty.
         const action = row.action || "";
         if (action === "cooling") return { color: cfg.ac.cooling_color || "#4fc3f7", opacity };
         if (action === "heating") return { color: cfg.ac.heating_color || "#ff9d45", opacity };
         if (action === "drying") return { color: cfg.ac.drying_color || "#7e8ce0", opacity };
         if (action === "fan") return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
+        if (["auto", "heat_cool"].includes(row.state)) {
+          return { color: cfg.ac.fan_color || "#4dd0e1", opacity };
+        }
         return null;
       });
     }
@@ -611,6 +623,11 @@ class LokioClimateCard extends HTMLElement {
         }
         if (row.state === "off") return null;
         if (row.state === "heat") return { color: cfg.radiator.color || "#ff9d45", opacity };
+        // A climate radiator can remain in an active composite mode while
+        // hvac_action temporarily reports idle. Keep the activity continuous.
+        if (["auto", "heat_cool"].includes(row.state)) {
+          return { color: cfg.radiator.color || "#ff9d45", opacity };
+        }
         return (row.action || "") === "heating" ? { color: cfg.radiator.color || "#ff9d45", opacity } : null;
       });
     }
@@ -629,7 +646,9 @@ class LokioClimateCard extends HTMLElement {
         if (action === "cooling") return { color: cfg.hrv.cooling_color || "#4fc3f7", opacity };
         if (action === "heating") return { color: cfg.hrv.heating_color || "#ffb74d", opacity };
         if (action === "fan") return { color: cfg.hrv.fan_color || "#4dd0e1", opacity };
-        return null;
+        // Any non-off climate mode is considered active for HRV. This avoids
+        // artificial gaps when hvac_action is idle between ventilation cycles.
+        return { color: cfg.hrv.fan_color || cfg.hrv.on_color || "#66bb6a", opacity };
       });
     }
 
