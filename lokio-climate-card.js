@@ -1,11 +1,11 @@
 /*
  * Lokio Climate Card
  * Standalone Lovelace climate dashboard card for Home Assistant.
- * v0.3.33-debug
+ * v0.3.34
  */
 
 const CARD_TAG = "lokio-climate-card";
-const VERSION = "0.3.33-debug";
+const VERSION = "0.3.34";
 
 const MODE_LABELS = {
   cool: "Охлаждение",
@@ -606,21 +606,55 @@ class LokioClimateCard extends HTMLElement {
 
     const addIntervals = (rows, getStyle) => {
       if (!Array.isArray(rows) || rows.length === 0) return;
-      const sorted = [...rows].sort((a, b) => a.t - b.t);
+      const sorted = [...rows]
+        .filter((row) => Number.isFinite(row?.t))
+        .sort((a, b) => a.t - b.t);
+
+      // History rows are state snapshots: a state remains valid until the next
+      // snapshot. Drawing one SVG rect per recorder row creates thousands of
+      // adjacent semi-transparent rectangles. At fractional pixel boundaries
+      // those rectangles can show hairline seams, which look like false
+      // activity interruptions. Build continuous intervals first and merge
+      // consecutive rows that resolve to the same visual style.
+      let active = null;
+      const flush = () => {
+        if (!active) return;
+        const from = Math.max(minT, active.from);
+        const to = Math.min(maxT, active.to);
+        if (to > from) {
+          const x1 = x(from);
+          const x2 = x(to);
+          const width = Math.max(0, x2 - x1);
+          if (width >= 0.2) {
+            rects.push(`<rect x="${x1.toFixed(2)}" y="0" width="${width.toFixed(2)}" height="${h}" fill="${this._escape(active.style.color)}" fill-opacity="${active.style.opacity.toFixed(3)}" />`);
+          }
+        }
+        active = null;
+      };
+
       for (let i = 0; i < sorted.length; i += 1) {
         const row = sorted[i];
         const nextT = i + 1 < sorted.length ? sorted[i + 1].t : maxT;
         const from = Math.max(minT, row.t);
         const to = Math.min(maxT, nextT);
         if (to <= from) continue;
+
         const style = getStyle(row);
-        if (!style) continue;
-        const x1 = x(from);
-        const x2 = x(to);
-        const width = Math.max(0, x2 - x1);
-        if (width < 0.2) continue;
-        rects.push(`<rect x="${x1.toFixed(2)}" y="0" width="${width.toFixed(2)}" height="${h}" fill="${this._escape(style.color)}" fill-opacity="${style.opacity.toFixed(3)}" />`);
+        if (!style) {
+          flush();
+          continue;
+        }
+
+        const styleKey = `${style.color}|${style.opacity.toFixed(3)}`;
+        if (active && active.styleKey === styleKey && from <= active.to + 1) {
+          active.to = to;
+        } else {
+          flush();
+          active = { from, to, style, styleKey };
+        }
       }
+
+      flush();
     };
 
     if (cfg.ac?.enabled !== false && room.ac) {

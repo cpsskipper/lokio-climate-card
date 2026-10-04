@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.34
+- Fixed activity fill rendering: consecutive history samples with the same active state are merged into continuous SVG intervals.
+- Prevented fractional-pixel seams between adjacent activity rectangles from appearing as false interruptions.
+- No changes to activity state detection: climate activity still uses `hvac_mode`/entity state, with `hvac_action` only assisting color selection for composite modes.
+
+# Changelog
+
 ## 0.3.33-debug
 
 - Added a temporary HRV history export button enabled by `debug.history: true`.
