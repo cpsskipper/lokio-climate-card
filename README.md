@@ -276,16 +276,3 @@ MIT. See [`LICENSE`](LICENSE).
 ## Activity shading
 
 When `graph.activity.enabled: true`, climate activity is determined primarily from the climate entity state (`hvac_mode`). This avoids false gaps caused by short `hvac_action: idle` periods between heater/compressor cycles. For `auto` and `heat_cool`, `hvac_action` is used only to select the activity color; it is not treated as an on/off signal.
-
-## Диагностическая сборка 0.3.32-debug
-
-Для диагностики истории активности временно можно включить: 
-
-```yaml
-debug:
-  history: true
-```
-
-После этого внизу карточки появится кнопка **«Экспортировать историю HRV»**. Она скачивает JSON с сырой историей текущей комнаты для сущностей HRV, climate и датчика температуры за период `graph.hours_to_show`, включая attributes.
-
-После получения файла отключите `debug.history`.

@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.3.32-debug
-- Добавлен временный диагностический экспорт сырой истории HRV/climate/температурного датчика в JSON.
-- Экспорт включает attributes и период `graph.hours_to_show`.
+## 0.3.33-debug
+
+- Added a temporary HRV history export button enabled by `debug.history: true`.
+- The export downloads the raw Home Assistant Recorder history rows for the selected room's `hrv` entity, including climate attributes.
+- Updated the embedded card build version to `0.3.33-debug`.
 
 
 ## 0.3.31
